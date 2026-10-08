@@ -1,0 +1,1391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quantman Strategy Portfolio Analyser</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f0f0f5;color:#1a1a2e;min-height:100vh;font-size:14px}
+
+header{background:#fff;padding:14px 24px;border-bottom:1px solid #e0e0e0;display:flex;align-items:center;justify-content:space-between;gap:12px}
+header h1{font-size:20px;font-weight:700;color:#1a1a2e;letter-spacing:-.3px}
+header .sub{font-size:12px;color:#888;margin-top:2px}
+.badge{background:#eef1ff;color:#2952cc;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;border:1px solid #c8d8ff}
+.btn-upload{display:flex;align-items:center;gap:7px;padding:7px 16px;background:#2952cc;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:background .15s;position:relative;overflow:hidden}
+.btn-upload:hover{background:#1e3fa0}
+.btn-upload input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+
+/* Global drop overlay */
+.drop-overlay{position:fixed;inset:0;background:rgba(41,82,204,.12);border:3px dashed #4f7ef2;z-index:9000;display:none;align-items:center;justify-content:center;pointer-events:none}
+.drop-overlay.show{display:flex}
+.drop-overlay-inner{background:#fff;border-radius:16px;padding:36px 56px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.18)}
+.drop-overlay-inner .di{font-size:48px;margin-bottom:10px}
+.drop-overlay-inner p{font-size:18px;font-weight:700;color:#2952cc}
+.drop-overlay-inner span{font-size:13px;color:#888}
+
+.container{max-width:1500px;margin:0 auto;padding:20px}
+
+/* Loaded bar */
+.loaded-bar{background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.loaded-bar .cnt{font-weight:700;color:#2952cc;white-space:nowrap;font-size:13px}
+.file-chips{display:flex;flex-wrap:wrap;gap:5px}
+.fc{background:#f0f4ff;border:1px solid #c8d8ff;border-radius:20px;padding:2px 9px;font-size:11px;color:#3a5bc7}
+.fc .del{margin-left:5px;cursor:pointer;color:#888;font-size:10px}
+.fc .del:hover{color:#c00}
+
+/* Strategy selector */
+.strat-sel{background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:16px}
+.strat-sel h3{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.sel-actions{display:flex;gap:6px;margin-bottom:10px;align-items:center}
+.btn-sm{padding:4px 12px;border:1px solid #ddd;border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:#444;transition:background .15s}
+.btn-sm:hover{background:#f5f5f5}
+.strat-chips{display:flex;flex-wrap:wrap;gap:7px}
+.sc{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid #ddd;background:#fafafa;color:#555;transition:all .15s;user-select:none}
+.sc.sel{background:#eef1ff;border-color:#4f7ef2;color:#2952cc}
+.sc:hover{border-color:#999}
+
+/* Tabs */
+.tabs{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.tab-nav{display:flex;border-bottom:1px solid #e8e8e8;background:#fafafa;overflow-x:auto}
+.tab-btn{padding:13px 18px;border:none;background:none;font-size:13px;color:#666;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;font-weight:500}
+.tab-btn.active{color:#2952cc;border-bottom-color:#4f7ef2;font-weight:700;background:#fff}
+.tab-btn:hover:not(.active){color:#333;background:#f0f0f0}
+.tab-content{display:none;padding:22px}
+.tab-content.active{display:block}
+
+/* Toggle row */
+.toggle-row{display:flex;border:1px solid #ddd;border-radius:8px;overflow:hidden;width:fit-content;margin-bottom:18px}
+.tog{padding:7px 16px;border:none;background:#fafafa;font-size:12px;color:#555;cursor:pointer;transition:all .15s;font-weight:500}
+.tog.active{background:#2952cc;color:#fff}
+.tog:not(.active):hover{background:#f0f0f0}
+
+/* Heatmap */
+.hm-wrap{overflow:auto;max-height:72vh}
+.hm-table{border-collapse:separate;border-spacing:3px;font-size:11px}
+.hm-table th.rl{text-align:right;padding:3px 7px;font-weight:600;white-space:nowrap;color:#333;min-width:48px;font-size:11px}
+.hm-table th.rl.hl{color:#2952cc}
+.hm-table th.cl{text-align:center;writing-mode:vertical-rl;transform:rotate(180deg);height:56px;color:#333;vertical-align:bottom;padding-bottom:3px;font-weight:600;font-size:11px}
+.hm-table th.cl.hl{color:#2952cc}
+.hm-cell{width:30px;height:30px;border-radius:4px;text-align:center;vertical-align:middle;font-size:9px;font-weight:700;cursor:pointer;transition:opacity .1s;letter-spacing:0}
+.hm-cell:hover{opacity:.75;outline:2px solid #333}
+.hm-cell.empty{background:#f5f5f5!important;cursor:default}
+.hm-cell.empty:hover{opacity:1;outline:none}
+
+/* Legend */
+.hm-legend{display:flex;align-items:center;gap:20px;margin-top:14px;font-size:12px;color:#555;flex-wrap:wrap}
+.leg-bar{width:130px;height:11px;border-radius:6px;background:linear-gradient(to right,#6baed6,#ffffff,#d73027)}
+.leg-hl{color:#2952cc;font-weight:600}
+.leg-row{display:flex;align-items:center;gap:6px}
+
+/* Tooltip */
+.hm-tip{position:fixed;background:rgba(20,20,40,.9);color:#fff;padding:7px 11px;border-radius:7px;font-size:12px;pointer-events:none;z-index:9999;display:none;white-space:nowrap}
+
+/* Tables */
+.dt{width:100%;border-collapse:collapse;font-size:13px}
+.dt th{text-align:left;padding:9px 13px;border-bottom:2px solid #e8e8e8;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#777;white-space:nowrap;cursor:pointer;user-select:none}
+.dt th:hover{color:#2952cc}
+.dt th.sort-asc::after{content:' ▲';font-size:9px}
+.dt th.sort-desc::after{content:' ▼';font-size:9px}
+.dt td{padding:9px 13px;border-bottom:1px solid #f0f0f0;color:#333}
+.dt tr:hover td{background:#f8f9ff!important}
+.dt tr:nth-child(odd) td{background:#fafafa}
+.dt td.num{text-align:right;font-variant-numeric:tabular-nums;font-family:'SF Mono',Menlo,monospace;font-size:12px}
+.dt td.pos{color:#0a7a2e;font-weight:600}
+.dt td.neg{color:#c23b22;font-weight:600}
+.dt td.rk{color:#aaa;font-size:11px;width:32px}
+.corr-bar-wrap{display:flex;align-items:center;gap:7px}
+.corr-bar{height:7px;border-radius:4px;min-width:2px}
+.corr-val{font-family:'SF Mono',Menlo,monospace;font-size:12px;color:#333;white-space:nowrap}
+
+/* Section */
+.sec-hd{display:flex;align-items:baseline;gap:10px;margin-bottom:14px;margin-top:6px}
+.sec-hd h2{font-size:15px;font-weight:700}
+.sec-hd p{font-size:12px;color:#888}
+
+/* Margin card */
+.mc{background:#f4f7ff;border:1px solid #dce4ff;border-radius:10px;padding:18px 22px;margin-bottom:20px}
+.mc .mc-label{font-size:12px;color:#666;margin-bottom:4px}
+.mc .mc-val{font-size:26px;font-weight:800;color:#1a1a2e;margin-bottom:3px}
+.mc .mc-detail{font-size:13px;color:#444;margin-bottom:8px}
+.mc .mc-strats{font-size:12px;color:#555}
+.mc .mc-strats strong{color:#2952cc}
+
+/* Portfolio summary cards */
+.pf-cards{display:flex;gap:12px;flex-wrap:wrap}
+.pf-card{flex:1;min-width:180px;background:#fff;border:1px solid #e0e4f0;border-radius:10px;padding:14px 18px}
+.pf-card .pf-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#888;margin-bottom:6px}
+.pf-card .pf-val{font-size:22px;font-weight:800;color:#1a1a2e;margin-bottom:2px}
+.pf-card .pf-val.pos{color:#0a7a2e}
+.pf-card .pf-val.neg{color:#c23b22}
+.pf-card .pf-sub{font-size:11px;color:#999}
+.pf-card.highlight{background:#eef1ff;border-color:#c8d8ff}
+
+/* Selected matrix */
+.sm-wrap{overflow:auto;max-height:72vh}
+.sm-table{border-collapse:separate;border-spacing:2px;font-size:11px}
+.sm-table th{padding:5px 7px;font-weight:700;font-size:11px;white-space:nowrap;color:#333}
+.sm-table th.sl{text-align:right;min-width:46px;padding-right:10px}
+.sm-table th.sl.hl{color:#2952cc}
+.sm-cell{width:66px;height:32px;border-radius:5px;text-align:center;vertical-align:middle;font-size:11px;font-weight:600;cursor:pointer;transition:opacity .1s}
+.sm-cell:hover{opacity:.78;outline:2px solid rgba(0,0,0,.25)}
+.sm-cell.diag{background:#eee!important;color:#888;cursor:default}
+.sm-cell.diag:hover{opacity:1;outline:none}
+
+/* Empty */
+.empty{text-align:center;padding:56px 20px;color:#bbb}
+.empty .ei{font-size:36px;margin-bottom:10px}
+.empty p{font-size:13px}
+
+/* Info row */
+.info-row{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:16px}
+.info-pill{background:#f5f5f5;border:1px solid #e8e8e8;border-radius:8px;padding:10px 16px;font-size:12px;color:#555}
+.info-pill strong{display:block;font-size:15px;color:#1a1a2e;font-weight:700}
+
+@media(max-width:700px){
+  .container{padding:10px}
+  .hm-cell{width:22px;height:22px;font-size:8px}
+}
+</style>
+</head>
+<body>
+<!-- Global drop overlay -->
+<div class="drop-overlay" id="dropOverlay">
+  <div class="drop-overlay-inner">
+    <div class="di">📂</div>
+    <p>Drop CSV files anywhere</p>
+    <span>Up to 80 strategies</span>
+  </div>
+</div>
+
+<header>
+  <div>
+    <h1>Quantman</h1>
+    <div class="sub">Strategy Portfolio Analyser</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="badge" id="hdBadge" style="display:none">0 strategies loaded</span>
+    <button class="btn-upload" title="Click to select CSV files, or drag &amp; drop anywhere on the page">
+      <input type="file" id="fileInput" multiple accept=".csv">
+      ＋ Load Strategies
+    </button>
+  </div>
+</header>
+
+<div class="container">
+  <!-- Loaded bar -->
+  <div class="loaded-bar" id="loadedBar" style="display:none">
+    <span class="cnt" id="loadedCnt">0 strategies</span>
+    <div class="file-chips" id="fileChips"></div>
+    <button class="btn-sm" onclick="document.getElementById('fileInput2').click()" style="margin-left:auto">+ Add more</button>
+    <input type="file" id="fileInput2" multiple accept=".csv" style="display:none">
+  </div>
+
+  <!-- Strategy selector -->
+  <div class="strat-sel" id="stratSel" style="display:none">
+    <h3>Shortlist — select strategies for correlation table &amp; margin analysis</h3>
+    <div class="sel-actions">
+      <button class="btn-sm" id="btnAll">Select all</button>
+      <button class="btn-sm" id="btnNone">Clear all</button>
+      <span style="font-size:12px;color:#999;margin-left:6px"><span id="selCount">0</span> selected</span>
+    </div>
+    <div class="strat-chips" id="stratChips"></div>
+  </div>
+
+  <!-- Main tabs -->
+  <div class="tabs" id="mainTabs" style="display:none">
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="perf">Performance</button>
+      <button class="tab-btn" data-tab="worst">Worst Days</button>
+      <button class="tab-btn" data-tab="dd">Drawdowns</button>
+      <button class="tab-btn" data-tab="corr">Correlation Matrix</button>
+      <button class="tab-btn" data-tab="selmatrix">Selected Strategy Matrix</button>
+      <button class="tab-btn" data-tab="pairs">Least Correlated Pairs</button>
+      <button class="tab-btn" data-tab="shared">Shared Trade Days</button>
+      <button class="tab-btn" data-tab="margin">Margin Analysis</button>
+    </div>
+
+    <!-- Tab: Performance Summary -->
+    <div class="tab-content active" id="tab-perf">
+      <div class="sec-hd">
+        <h2>Strategy Performance Summary</h2>
+        <p id="perfRangeLabel">Per-strategy statistics · shortlisted strategies highlighted</p>
+      </div>
+
+      <!-- Range filter bar -->
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+        <div class="toggle-row" id="yearFilterRow" style="flex-wrap:wrap;height:auto"></div>
+        <div id="customRangeInputs" style="display:none;align-items:center;gap:6px">
+          <input type="date" id="perfFrom" style="padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;color:#333">
+          <span style="color:#888;font-size:12px">to</span>
+          <input type="date" id="perfTo" style="padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;color:#333">
+          <button class="btn-sm" id="applyRangeBtn">Apply</button>
+        </div>
+      </div>
+
+      <!-- Portfolio summary cards -->
+      <div id="perfSummaryRow" style="display:none;margin-bottom:18px"></div>
+
+      <div id="perfContainer"></div>
+    </div>
+
+    <!-- Tab: Worst Days -->
+    <div class="tab-content" id="tab-worst">
+      <div class="sec-hd">
+        <h2 id="worstDaysTitle">Top 10 Worst Days</h2>
+        <p>Days with the largest combined loss across all loaded strategies</p>
+      </div>
+      <div id="worstDaysContainer"></div>
+    </div>
+
+    <!-- Tab: Drawdowns -->
+    <div class="tab-content" id="tab-dd">
+      <div class="sec-hd">
+        <h2 id="ddTitle">Biggest Drawdowns</h2>
+        <p>How long each drawdown took to fully recover · combined equity of all loaded strategies</p>
+      </div>
+      <div id="ddContainer"></div>
+    </div>
+
+    <!-- Tab: Correlation Heatmap -->
+    <div class="tab-content" id="tab-corr">
+      <div class="toggle-row">
+        <button class="tog active" data-mode="monthly">Monthly P&amp;L Correlation</button>
+        <button class="tog" data-mode="shared">Shared Trade Days</button>
+      </div>
+      <div class="hm-wrap"><div id="hmContainer"></div></div>
+      <div class="hm-legend">
+        <div class="leg-row">
+          <span>Offset</span>
+          <div class="leg-bar"></div>
+          <span>Move together</span>
+        </div>
+        <span class="leg-hl">Highlighted = your shortlist</span>
+        <span id="hmHint" style="color:#999;font-size:11px"></span>
+      </div>
+    </div>
+
+    <!-- Tab: Selected Strategy Matrix -->
+    <div class="tab-content" id="tab-selmatrix">
+      <div class="sec-hd">
+        <h2>Correlation Table — Selected Strategies</h2>
+        <p>Full matrix for shortlisted strategies · Monthly P&amp;L correlation</p>
+      </div>
+      <div class="sm-wrap"><div id="smContainer"></div></div>
+    </div>
+
+    <!-- Tab: Least Correlated Pairs -->
+    <div class="tab-content" id="tab-pairs">
+      <div class="sec-hd">
+        <h2>Least Correlated Pairs</h2>
+        <p>Best pairs to combine · sorted by absolute monthly P&amp;L correlation (low → high)</p>
+      </div>
+      <div id="pairsContainer"></div>
+    </div>
+
+    <!-- Tab: Shared Trade Days -->
+    <div class="tab-content" id="tab-shared">
+      <div class="sec-hd">
+        <h2>Shared Trade Days</h2>
+        <p>Calendar days where both strategies had at least one trade</p>
+      </div>
+      <div id="sharedContainer"></div>
+    </div>
+
+    <!-- Tab: Margin Analysis -->
+    <div class="tab-content" id="tab-margin">
+      <div class="sec-hd">
+        <h2>Peak Margin — Selected Strategies</h2>
+        <p>Buying options: margin = entry price × lot size. Shows max premium tied up at one moment.</p>
+      </div>
+      <div id="selMarginContainer"></div>
+
+      <div class="sec-hd" style="margin-top:30px">
+        <h2>Peak Margin Consumption Days — All Strategies</h2>
+        <p>Top 10 days when all loaded strategies together tied up the most premium at one moment</p>
+      </div>
+      <div id="allMarginContainer"></div>
+    </div>
+  </div>
+</div>
+
+<div class="hm-tip" id="hmTip"></div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+const S = {};        // name → { trades, dailyPnL, monthlyPnL, tradeDays }
+const shortlist = new Set();
+let hmMode = 'monthly';
+let corrCache = null;
+let sharedCache = null;
+let sortPairs = {col:'corr', dir:1};
+let sortShared = {col:'days', dir:-1};
+let sortDays = {col:'peak', dir:-1};
+let sortPerf = {col:'name', dir:1};
+let perfRangeType = 'all'; // 'all' | 'year' | 'custom'
+let perfRangeYear = null;
+let perfRangeFrom = null;  // 'YYYY-MM-DD'
+let perfRangeTo   = null;
+
+// ─── PARSE HELPERS ────────────────────────────────────────────────────────────
+const MO = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+const MN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function parseDT(s) {
+  // "DD Mon YYYY HH:MM:SS"
+  const p = s.trim().split(' ');
+  const tp = p[3].split(':');
+  return new Date(+p[2], MO[p[1]], +p[0], +tp[0], +tp[1], +tp[2]);
+}
+
+function dKey(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function mKey(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function fmtD(d) {
+  return d.getDate()+' '+MN[d.getMonth()]+' '+d.getFullYear();
+}
+function fmtT(d) {
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+function fmtINR(n) {
+  if (isNaN(n)) return '₹0';
+  const sign = n < 0 ? '−' : '';
+  return sign+'₹'+Math.abs(Math.round(n)).toLocaleString('en-IN');
+}
+function fmtINRSign(n) {
+  if (isNaN(n)) return '₹0';
+  const sign = n >= 0 ? '+' : '−';
+  return sign+'₹'+Math.abs(Math.round(n)).toLocaleString('en-IN');
+}
+
+function extractName(filename) {
+  const base = filename.replace(/\.csv$/i,'');
+  const m = base.match(/-NF\s+(.+)$/);
+  if (m) return m[1].replace(/\s+/g,'');
+  return base.replace(/^\d+-/,'').replace(/\s+/g,'');
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  const trades = [];
+  for (let i = 1; i < lines.length; i++) {
+    const c = lines[i].split(',');
+    if (c.length < 10) continue;
+    const qty = +c[2];
+    const ep  = +c[4];
+    const et  = parseDT(c[5]);
+    const xt  = parseDT(c[8]);
+    const pnl = +c[9];
+    if (isNaN(ep) || isNaN(pnl)) continue;
+    trades.push({ qty, entryPrice:ep, entryTime:et, exitTime:xt,
+                  entryDate:dKey(et), profit:pnl, margin:ep*qty });
+  }
+  return trades;
+}
+
+function buildStrategy(trades) {
+  const dailyPnL = {}, monthlyPnL = {}, tradeDays = new Set();
+  for (const t of trades) {
+    const d = t.entryDate, m = d.slice(0,7);
+    dailyPnL[d]   = (dailyPnL[d]   || 0) + t.profit;
+    monthlyPnL[m] = (monthlyPnL[m] || 0) + t.profit;
+    tradeDays.add(d);
+  }
+  return { trades, dailyPnL, monthlyPnL, tradeDays };
+}
+
+// ─── STATISTICS ───────────────────────────────────────────────────────────────
+function pearson(a, b) {
+  const n = a.length;
+  if (n < 3) return 0;
+  let ma=0, mb=0;
+  for (let i=0;i<n;i++){ma+=a[i];mb+=b[i];}
+  ma/=n; mb/=n;
+  let num=0, da2=0, db2=0;
+  for (let i=0;i<n;i++){
+    const da=a[i]-ma, db=b[i]-mb;
+    num+=da*db; da2+=da*da; db2+=db*db;
+  }
+  const den=Math.sqrt(da2*db2);
+  return den===0 ? 0 : Math.max(-1,Math.min(1,num/den));
+}
+
+function corrAB(na, nb) {
+  const sA=S[na], sB=S[nb];
+  const months=[...new Set([...Object.keys(sA.monthlyPnL),...Object.keys(sB.monthlyPnL)])].sort();
+  return pearson(months.map(m=>sA.monthlyPnL[m]||0), months.map(m=>sB.monthlyPnL[m]||0));
+}
+
+function sharedAB(na, nb) {
+  let c=0;
+  const dA=S[na].tradeDays, dB=S[nb].tradeDays;
+  for (const d of dA) if (dB.has(d)) c++;
+  return c;
+}
+
+function getCorrMatrix() {
+  if (corrCache) return corrCache;
+  const names=Object.keys(S);
+  const m={};
+  for (let i=0;i<names.length;i++)
+    for (let j=i+1;j<names.length;j++)
+      m[names[i]+'|'+names[j]]=corrAB(names[i],names[j]);
+  corrCache=m; return m;
+}
+
+function getSharedMatrix() {
+  if (sharedCache) return sharedCache;
+  const names=Object.keys(S);
+  const m={};
+  for (let i=0;i<names.length;i++)
+    for (let j=i+1;j<names.length;j++)
+      m[names[i]+'|'+names[j]]=sharedAB(names[i],names[j]);
+  sharedCache=m; return m;
+}
+
+function getCorr(a,b) {
+  const m=getCorrMatrix();
+  return m[a+'|'+b]??m[b+'|'+a]??0;
+}
+function getShared(a,b) {
+  const m=getSharedMatrix();
+  return m[a+'|'+b]??m[b+'|'+a]??0;
+}
+
+function sortedNames() {
+  return Object.keys(S).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+}
+
+// ─── MARGIN ───────────────────────────────────────────────────────────────────
+function peakForDay(trades) {
+  // trades: already filtered to one date across strategies
+  if (!trades.length) return {peak:0,peakTime:null,peakTrades:0};
+  const evts=[];
+  for (const t of trades) {
+    evts.push({ms:t.entryTime.getTime(), d:+t.margin, open:true});
+    evts.push({ms:t.exitTime.getTime(),  d:-t.margin, open:false});
+  }
+  evts.sort((a,b)=>a.ms!==b.ms?a.ms-b.ms:(b.open-a.open));
+  let run=0, peak=0, peakMs=0, openCnt=0, peakCnt=0;
+  for (const e of evts) {
+    run+=e.d;
+    if (e.open) openCnt++; else openCnt--;
+    if (run>peak) { peak=run; peakMs=e.ms; peakCnt=openCnt; }
+  }
+  return {peak, peakTime:peakMs?new Date(peakMs):null, peakTrades:peakCnt};
+}
+
+function allPeakDays(tradesList) {
+  const byDate={};
+  for (const t of tradesList) {
+    if (!byDate[t.entryDate]) byDate[t.entryDate]=[];
+    byDate[t.entryDate].push(t);
+  }
+  const res=[];
+  for (const [date,trades] of Object.entries(byDate)) {
+    const {peak,peakTime,peakTrades}=peakForDay(trades);
+    if (peak<=0) continue;
+    const totalPnL=trades.reduce((s,t)=>s+t.profit,0);
+    res.push({date,peak,peakTime,peakTrades,totalPnL});
+  }
+  return res.sort((a,b)=>b.peak-a.peak);
+}
+
+// ─── COLORS ───────────────────────────────────────────────────────────────────
+function corrColor(v) {
+  const t=Math.max(-1,Math.min(1,v));
+  if (Math.abs(t)<.008) return '#fff';
+  if (t>0) {
+    return `rgb(255,${Math.round(255-t*185)},${Math.round(255-t*192)})`;
+  } else {
+    const a=-t;
+    return `rgb(${Math.round(255-a*170)},${Math.round(255-a*130)},255)`;
+  }
+}
+function sharedColor(v, mx) {
+  if (!mx||!v) return '#fff';
+  const t=v/mx;
+  return `rgb(255,${Math.round(255-t*185)},${Math.round(255-t*192)})`;
+}
+function corrTextColor(v) {
+  return Math.abs(v)>0.65?'#fff':'#333';
+}
+
+// ─── SHARED FULL-MATRIX RENDERER ─────────────────────────────────────────────
+function renderFullMatrix(names, el, mode) {
+  // mode: 'monthly' | 'shared'
+  if (!names.length) { el.innerHTML='<div class="empty"><div class="ei">📊</div><p>Load CSV files to see the matrix</p></div>'; return; }
+  if (names.length<2) { el.innerHTML='<div class="empty"><div class="ei">☝️</div><p>Select at least 2 strategies from the shortlist above</p></div>'; return; }
+
+  const isShared=mode==='shared';
+  let maxSh=1;
+  if (isShared) {
+    for (let i=0;i<names.length;i++)
+      for (let j=i+1;j<names.length;j++)
+        maxSh=Math.max(maxSh,getShared(names[i],names[j]));
+  }
+
+  let h='<table class="sm-table"><thead><tr><th class="sl"></th>';
+  for (const n of names) {
+    const hl=shortlist.has(n);
+    h+=`<th style="text-align:center;padding:4px 6px;font-size:11px;font-weight:700;${hl?'color:#2952cc':''}">${n}</th>`;
+  }
+  h+='</tr></thead><tbody>';
+
+  for (const na of names) {
+    const hlRow=shortlist.has(na);
+    h+=`<tr><th class="sl${hlRow?' hl':''}">${na}</th>`;
+    for (const nb of names) {
+      if (na===nb) {
+        if (isShared) {
+          const td=S[na].tradeDays.size;
+          h+=`<td class="sm-cell diag" title="Total trade days: ${td}">${td}</td>`;
+        } else {
+          h+='<td class="sm-cell diag">1.00</td>';
+        }
+      } else {
+        const v=isShared?getShared(na,nb):getCorr(na,nb);
+        const bg=isShared?sharedColor(v,maxSh):corrColor(v);
+        const tc=isShared?(v/maxSh>0.62?'#fff':'#333'):corrTextColor(v);
+        const label=isShared?String(v):v.toFixed(2);
+        const tipMode=isShared?`${v} shared days`:`r = ${v.toFixed(3)}`;
+        h+=`<td class="sm-cell" style="background:${bg};color:${tc}"
+            data-a="${na}" data-b="${nb}" data-v="${isShared?v:v.toFixed(4)}" data-mode="${mode}"
+            onmouseenter="showTip(event,this)" onmouseleave="hideTip()">${label}</td>`;
+      }
+    }
+    h+='</tr>';
+  }
+  h+='</tbody></table>';
+  el.innerHTML=h;
+}
+
+// ─── PERFORMANCE ─────────────────────────────────────────────────────────────
+function availableYears() {
+  const yrs=new Set();
+  for (const n of Object.keys(S))
+    for (const d of Object.keys(S[n].dailyPnL))
+      yrs.add(d.slice(0,4));
+  return [...yrs].sort();
+}
+
+function perfBounds() {
+  if (perfRangeType==='all')    return {from:'0000-00-00', to:'9999-99-99'};
+  if (perfRangeType==='year')   return {from:`${perfRangeYear}-01-01`, to:`${perfRangeYear}-12-31`};
+  return {from:perfRangeFrom||'0000-00-00', to:perfRangeTo||'9999-99-99'};
+}
+
+function computePerfRange(name, from, to) {
+  const trades = S[name].trades
+    .filter(t=>t.entryDate>=from && t.entryDate<=to)
+    .sort((a,b)=>a.entryTime-b.entryTime);
+
+  if (!trades.length) return {name, tradeCount:0, firstDate:null, lastDate:null,
+    netPnL:0, winPct:0, profitFactor:0, maxDD:0, worstPct:0, last12m:0, last12mTrades:0};
+
+  const firstDate=trades[0].entryTime, lastDate=trades[trades.length-1].entryTime;
+  let netPnL=0, wins=0, sumPos=0, sumNeg=0, worstTrade=null;
+  for (const t of trades) {
+    netPnL+=t.profit;
+    if (t.profit>0){wins++;sumPos+=t.profit;}
+    else if(t.profit<0) sumNeg+=t.profit;
+    if (!worstTrade||t.profit<worstTrade.profit) worstTrade=t;
+  }
+  const winPct=trades.length?wins/trades.length*100:0;
+  const profitFactor=sumNeg!==0?sumPos/Math.abs(sumNeg):(sumPos>0?Infinity:0);
+
+  let cum=0, peak=0, maxDD=0;
+  for (const t of trades){
+    cum+=t.profit; if(cum>peak)peak=cum;
+    const dd=peak-cum; if(dd>maxDD)maxDD=dd;
+  }
+  const worstPct=(worstTrade&&worstTrade.margin>0)?(worstTrade.profit/worstTrade.margin*100):0;
+
+  // Last 12 months from today (always relative to today, not range)
+  const now=new Date(), cutoff=new Date(now.getFullYear()-1,now.getMonth(),now.getDate());
+  let last12m=0, last12mTrades=0;
+  for (const t of S[name].trades)
+    if(t.entryTime>=cutoff){last12m+=t.profit;last12mTrades++;}
+
+  return {name,tradeCount:trades.length,firstDate,lastDate,
+          netPnL,winPct,profitFactor,maxDD,worstPct,last12m,last12mTrades};
+}
+
+// Combined portfolio metrics for shortlisted strategies over a date range
+function portfolioMetrics(slNames, from, to) {
+  if (!slNames.length) return null;
+  const combined={};
+  for (const n of slNames)
+    for (const [date,pnl] of Object.entries(S[n].dailyPnL))
+      if(date>=from&&date<=to) combined[date]=(combined[date]||0)+pnl;
+
+  const dates=Object.keys(combined).sort();
+  if (!dates.length) return null;
+
+  let cum=0, hwm=0, maxDD=0, netPnL=0, winDays=0, totalTrades=0;
+  for (const date of dates){
+    const pnl=combined[date];
+    netPnL+=pnl; cum+=pnl;
+    if(cum>hwm)hwm=cum;
+    const dd=hwm-cum; if(dd>maxDD)maxDD=dd;
+    if(pnl>0)winDays++;
+  }
+  for (const n of slNames)
+    totalTrades+=S[n].trades.filter(t=>t.entryDate>=from&&t.entryDate<=to).length;
+
+  return {netPnL, maxDD, winDayPct:dates.length?winDays/dates.length*100:0,
+          tradingDays:dates.length, totalTrades};
+}
+
+function fmtPeriod(d1, d2) {
+  const f=d=>MN[d.getMonth()]+' '+String(d.getFullYear()).slice(2);
+  return f(d1)+' – '+f(d2);
+}
+
+function renderPerformance() {
+  const el=document.getElementById('perfContainer');
+  const names=sortedNames();
+  if (!names.length) {
+    el.innerHTML='<div class="empty"><div class="ei">📊</div><p>Load CSV files to see performance summary</p></div>';
+    document.getElementById('perfSummaryRow').style.display='none';
+    return;
+  }
+
+  // ── Year filter bar ──────────────────────────────────────────────────────
+  const yrs=availableYears();
+  const filterRow=document.getElementById('yearFilterRow');
+  let fb='<button class="tog'+(perfRangeType==='all'?' active':'')+'" data-yr="all">All time</button>';
+  for (const y of yrs)
+    fb+=`<button class="tog${perfRangeType==='year'&&perfRangeYear===y?' active':''}" data-yr="${y}">${y}</button>`;
+  fb+=`<button class="tog${perfRangeType==='custom'?' active':''}" data-yr="custom">Custom</button>`;
+  filterRow.innerHTML=fb;
+
+  filterRow.querySelectorAll('.tog').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const yr=btn.dataset.yr;
+      if(yr==='all'){perfRangeType='all';perfRangeYear=null;}
+      else if(yr==='custom'){perfRangeType='custom';}
+      else{perfRangeType='year';perfRangeYear=yr;}
+      document.getElementById('customRangeInputs').style.display=
+        perfRangeType==='custom'?'flex':'none';
+      renderPerformance();
+    });
+  });
+  document.getElementById('customRangeInputs').style.display=
+    perfRangeType==='custom'?'flex':'none';
+
+  // Apply custom range button
+  document.getElementById('applyRangeBtn').onclick=()=>{
+    perfRangeFrom=document.getElementById('perfFrom').value||null;
+    perfRangeTo  =document.getElementById('perfTo').value||null;
+    renderPerformance();
+  };
+
+  // ── Range bounds & label ─────────────────────────────────────────────────
+  const {from,to}=perfBounds();
+  const isFiltered=perfRangeType!=='all';
+  let rangeLabel='Per-strategy statistics across full trade history · shortlisted strategies highlighted';
+  if(perfRangeType==='year') rangeLabel=`Statistics for ${perfRangeYear} · shortlisted strategies highlighted`;
+  else if(perfRangeType==='custom'&&perfRangeFrom&&perfRangeTo)
+    rangeLabel=`Statistics ${perfRangeFrom} → ${perfRangeTo} · shortlisted strategies highlighted`;
+  document.getElementById('perfRangeLabel').textContent=rangeLabel;
+
+  // ── Portfolio summary cards (shortlisted only) ───────────────────────────
+  const slNames=sortedNames().filter(n=>shortlist.has(n));
+  const summaryRow=document.getElementById('perfSummaryRow');
+  if (slNames.length>=1) {
+    const pm=portfolioMetrics(slNames,from,to);
+    if (pm) {
+      const ddPct=pm.netPnL>0?(pm.maxDD/Math.max(pm.netPnL,1)*100):0;
+      summaryRow.style.display='';
+      summaryRow.innerHTML=`<div class="pf-cards">
+        <div class="pf-card highlight">
+          <div class="pf-label">Net Portfolio P&amp;L</div>
+          <div class="pf-val ${pm.netPnL>=0?'pos':'neg'}">${fmtINRSign(pm.netPnL)}</div>
+          <div class="pf-sub">${slNames.length} selected strateg${slNames.length===1?'y':'ies'} · ${pm.totalTrades} trades</div>
+        </div>
+        <div class="pf-card highlight">
+          <div class="pf-label">Combined Max Drawdown</div>
+          <div class="pf-val neg">${fmtINR(pm.maxDD)}</div>
+          <div class="pf-sub">Portfolio-level DD · gains in one offset losses in others</div>
+        </div>
+        <div class="pf-card">
+          <div class="pf-label">Portfolio Win Days</div>
+          <div class="pf-val">${pm.winDayPct.toFixed(0)}%</div>
+          <div class="pf-sub">${pm.tradingDays} trading days in range</div>
+        </div>
+      </div>`;
+    } else {
+      summaryRow.style.display='none';
+    }
+  } else {
+    summaryRow.style.display='none';
+  }
+
+  // ── Per-strategy table ───────────────────────────────────────────────────
+  let rows=names.map(n=>({...computePerfRange(n,from,to), isSl:shortlist.has(n)}));
+  rows.sort((a,b)=>{
+    let va=a[sortPerf.col], vb=b[sortPerf.col];
+    if(sortPerf.col==='period'){va=a.firstDate?a.firstDate.getTime():0;vb=b.firstDate?b.firstDate.getTime():0;}
+    if(sortPerf.col==='name') return sortPerf.dir*a.name.localeCompare(b.name,undefined,{numeric:true});
+    return sortPerf.dir*(va<vb?-1:va>vb?1:0);
+  });
+
+  const COLS=[
+    {key:'name',         label:'Strategy'},
+    {key:'tradeCount',   label:'Trades',        align:'right'},
+    {key:'period',       label:'Period'},
+    {key:'netPnL',       label:'Net P&L',        align:'right'},
+    {key:'winPct',       label:'Win %',          align:'right'},
+    {key:'profitFactor', label:'Profit Factor',  align:'right'},
+    {key:'maxDD',        label:'Max DD',         align:'right'},
+    {key:'worstPct',     label:'Worst Trade',    align:'right'},
+    ...(!isFiltered?[{key:'last12m', label:'Last 12 Months', align:'right'}]:[]),
+  ];
+
+  let h='<table class="dt"><thead><tr>';
+  for (const c of COLS){
+    const asc=sortPerf.col===c.key&&sortPerf.dir===1;
+    const dsc=sortPerf.col===c.key&&sortPerf.dir===-1;
+    const cls=asc?'sort-asc':dsc?'sort-desc':'';
+    const sty=c.align==='right'?' style="text-align:right"':'';
+    h+=`<th data-sort="${c.key}" class="${cls}"${sty}>${c.label}</th>`;
+  }
+  h+='</tr></thead><tbody>';
+
+  for (const r of rows){
+    const fw=r.isSl?'font-weight:700':'';
+    if(r.tradeCount===0){
+      h+=`<tr style="opacity:.45;${fw}"><td><strong>${r.name}</strong></td>
+        <td colspan="${COLS.length-1}" style="color:#aaa;font-size:12px;text-align:center">No trades in this period</td></tr>`;
+      continue;
+    }
+    const pfStr=isFinite(r.profitFactor)?r.profitFactor.toFixed(1):'∞';
+    let last12Html='';
+    if(!isFiltered){
+      if(r.last12mTrades===0) last12Html='<span style="color:#aaa;font-size:11px">No trades</span>';
+      else if(r.last12mTrades===1) last12Html='<span style="color:#aaa;font-size:11px">1 trade</span>';
+      else last12Html=`<span class="${r.last12m>=0?'pos':'neg'}">${fmtINRSign(r.last12m)}</span>`;
+    }
+    h+=`<tr style="${fw}">
+      <td><strong>${r.name}</strong></td>
+      <td class="num">${r.tradeCount}</td>
+      <td style="font-size:12px;color:#555;white-space:nowrap">${r.firstDate?fmtPeriod(r.firstDate,r.lastDate):'—'}</td>
+      <td class="num ${r.netPnL>=0?'pos':'neg'}">${fmtINR(r.netPnL)}</td>
+      <td class="num">${r.winPct.toFixed(0)}%</td>
+      <td class="num">${pfStr}</td>
+      <td class="num neg">${fmtINR(r.maxDD)}</td>
+      <td class="num ${r.worstPct>=0?'':'neg'}">${r.worstPct>=0?'+':''}${r.worstPct.toFixed(0)}%</td>
+      ${!isFiltered?`<td class="num">${last12Html}</td>`:''}
+    </tr>`;
+  }
+  h+='</tbody></table>';
+  el.innerHTML=h;
+
+  el.querySelectorAll('th[data-sort]').forEach(th=>{
+    const col=th.dataset.sort;
+    if(col===sortPerf.col) th.classList.add(sortPerf.dir===1?'sort-asc':'sort-desc');
+    th.addEventListener('click',()=>{
+      if(sortPerf.col===col) sortPerf.dir*=-1;
+      else{sortPerf.col=col;sortPerf.dir=col==='name'?1:-1;}
+      renderPerformance();
+    });
+  });
+}
+
+// ─── WORST DAYS ───────────────────────────────────────────────────────────────
+function renderWorstDays() {
+  const el = document.getElementById('worstDaysContainer');
+  const names = sortedNames();
+  if (!names.length) {
+    el.innerHTML='<div class="empty"><div class="ei">📉</div><p>Load strategy files to see worst days analysis</p></div>';
+    return;
+  }
+
+  // Update title with strategy count
+  document.getElementById('worstDaysTitle').textContent=`Top 10 Worst Days, all ${names.length} strateg${names.length===1?'y':'ies'}`;
+
+  // Aggregate trades by date
+  const byDate={};
+  for (const name of names) {
+    for (const t of S[name].trades) {
+      const d=t.entryDate;
+      if (!byDate[d]) byDate[d]={trades:[], stratPnL:{}};
+      byDate[d].trades.push({profit:t.profit, stratName:name});
+      byDate[d].stratPnL[name]=(byDate[d].stratPnL[name]||0)+t.profit;
+    }
+  }
+
+  // Compute per-day stats
+  const rows=[];
+  for (const [date, {trades, stratPnL}] of Object.entries(byDate)) {
+    const totalPnL=Object.values(stratPnL).reduce((s,v)=>s+v,0);
+    const loserTrades=trades.filter(t=>t.profit<0);
+    const biggestLoss=loserTrades.length?Math.min(...loserTrades.map(t=>t.profit)):0;
+    const losingStrats=Object.entries(stratPnL)
+      .filter(([,pnl])=>pnl<0)
+      .sort((a,b)=>a[1]-b[1])   // worst first
+      .map(([n])=>n);
+    rows.push({date, totalPnL, tradeCount:trades.length,
+               loserCount:loserTrades.length, biggestLoss, losingStrats});
+  }
+
+  // Sort by most negative net P&L day
+  rows.sort((a,b)=>a.totalPnL-b.totalPnL);
+  const top10=rows.slice(0,10);
+
+  if (!top10.length) {
+    el.innerHTML='<div class="empty"><p>No loss days found</p></div>';
+    return;
+  }
+
+  let h=`<table class="dt"><thead><tr>
+    <th class="rk">#</th>
+    <th>Date</th>
+    <th style="text-align:right">Day's loss</th>
+    <th style="text-align:right">Trades (losers)</th>
+    <th style="text-align:right">Biggest single loss</th>
+    <th>Strategies that lost</th>
+  </tr></thead><tbody>`;
+
+  top10.forEach(({date,totalPnL,tradeCount,loserCount,biggestLoss,losingStrats},i)=>{
+    const d=new Date(date+'T00:00:00');
+    const pnlCls=totalPnL<0?'neg':'pos';
+    h+=`<tr>
+      <td class="rk">${i+1}</td>
+      <td>${fmtD(d)}</td>
+      <td class="num ${pnlCls}">${fmtINRSign(totalPnL)}</td>
+      <td class="num">${tradeCount} (${loserCount})</td>
+      <td class="num neg">${fmtINRSign(biggestLoss)}</td>
+      <td style="font-size:12px;color:#555;line-height:1.6">${losingStrats.join(', ')}</td>
+    </tr>`;
+  });
+  h+='</tbody></table>';
+  el.innerHTML=h;
+}
+
+// ─── DRAWDOWNS ────────────────────────────────────────────────────────────────
+function renderDrawdowns() {
+  const el = document.getElementById('ddContainer');
+  const names = sortedNames();
+  if (!names.length) {
+    el.innerHTML='<div class="empty"><div class="ei">📉</div><p>Load strategy files to see drawdown analysis</p></div>';
+    return;
+  }
+  document.getElementById('ddTitle').textContent=
+    `Biggest drawdowns and how long they took to recover — all ${names.length} strateg${names.length===1?'y':'ies'}`;
+
+  // Build combined daily P&L then cumulative equity curve
+  const combined={};
+  for (const name of names)
+    for (const [date,pnl] of Object.entries(S[name].dailyPnL))
+      combined[date]=(combined[date]||0)+pnl;
+
+  const sortedDates=Object.keys(combined).sort();
+  if (!sortedDates.length) { el.innerHTML='<div class="empty"><p>No trade data found</p></div>'; return; }
+
+  const curve=[];
+  let cum=0;
+  for (const date of sortedDates) { cum+=combined[date]; curve.push({date,value:cum}); }
+
+  // Detect drawdown episodes using high-water-mark sweep
+  const episodes=[];
+  let hwm=0, hwmDate=sortedDates[0];
+  let inDD=false, troughVal=Infinity, troughDate=null;
+
+  for (const {date,value} of curve) {
+    if (value>=hwm) {
+      if (inDD) {
+        episodes.push({peakDate:hwmDate, peakVal:hwm, troughDate, troughVal, recoveryDate:date});
+        inDD=false; troughVal=Infinity;
+      }
+      hwm=value; hwmDate=date;
+    } else {
+      inDD=true;
+      if (value<troughVal) { troughVal=value; troughDate=date; }
+    }
+  }
+  // Open drawdown (not yet recovered)
+  if (inDD) episodes.push({peakDate:hwmDate, peakVal:hwm, troughDate, troughVal, recoveryDate:null});
+
+  // Sort by largest drop (most negative) first
+  episodes.sort((a,b)=>(a.troughVal-a.peakVal)-(b.troughVal-b.peakVal));
+  const top10=episodes.slice(0,10);
+
+  if (!top10.length) { el.innerHTML='<div class="empty"><p>No drawdown periods found</p></div>'; return; }
+
+  const cal=(d1,d2)=>Math.round((new Date(d2+'T00:00:00')-new Date(d1+'T00:00:00'))/86400000);
+
+  let h=`<table class="dt"><thead><tr>
+    <th class="rk">#</th>
+    <th>Peak</th>
+    <th>Bottom</th>
+    <th style="text-align:right">Drop</th>
+    <th>Recovered</th>
+    <th style="text-align:right">Days to bottom</th>
+    <th style="text-align:right">Days to recover</th>
+    <th style="text-align:right">Total time</th>
+  </tr></thead><tbody>`;
+
+  top10.forEach(({peakDate,peakVal,troughDate,troughVal,recoveryDate},i)=>{
+    const drop=troughVal-peakVal;
+    const d2b=cal(peakDate,troughDate);
+    const d2r=recoveryDate?cal(troughDate,recoveryDate):null;
+    const total=d2r!==null?d2b+d2r:null;
+
+    const recHtml=recoveryDate
+      ?fmtD(new Date(recoveryDate+'T00:00:00'))
+      :'<span style="color:#e08000;font-weight:600">Not yet</span>';
+    const d2rHtml=d2r!==null?String(d2r):'<span style="color:#aaa">—</span>';
+    const totalHtml=total!==null
+      ?`<span style="background:#f0f0f0;border-radius:4px;padding:2px 8px;font-weight:700">${total} days</span>`
+      :`<span style="color:#e08000;font-weight:600">${d2b}+ days</span>`;
+
+    h+=`<tr>
+      <td class="rk">${i+1}</td>
+      <td style="font-size:12px">${fmtD(new Date(peakDate+'T00:00:00'))}</td>
+      <td style="font-size:12px">${fmtD(new Date(troughDate+'T00:00:00'))}</td>
+      <td class="num neg">${fmtINRSign(drop)}</td>
+      <td style="font-size:12px">${recHtml}</td>
+      <td class="num">${d2b}</td>
+      <td class="num">${d2rHtml}</td>
+      <td class="num">${totalHtml}</td>
+    </tr>`;
+  });
+  h+='</tbody></table>';
+  el.innerHTML=h;
+}
+
+// ─── RENDER HEATMAP (TAB 1 — ALL STRATEGIES) ─────────────────────────────────
+function renderHeatmap() {
+  const el=document.getElementById('hmContainer');
+  const names=sortedNames();
+  document.getElementById('hmHint').textContent='';
+  renderFullMatrix(names, el, hmMode);
+}
+
+// ─── RENDER SELECTED MATRIX (TAB 2 — SHORTLIST ONLY) ─────────────────────────
+function renderSelectedMatrix() {
+  const el=document.getElementById('smContainer');
+  const names=sortedNames().filter(n=>shortlist.has(n));
+  renderFullMatrix(names, el, 'monthly');
+}
+
+// ─── RENDER PAIRS ─────────────────────────────────────────────────────────────
+function renderPairs() {
+  const el=document.getElementById('pairsContainer');
+  const mat=getCorrMatrix();
+  let pairs=Object.entries(mat).map(([k,v])=>{
+    const [a,b]=k.split('|');
+    return {a,b,corr:v,abscorr:Math.abs(v),shared:getShared(a,b)};
+  });
+
+  // sort
+  pairs.sort((x,y)=>{
+    let va=x[sortPairs.col], vb=y[sortPairs.col];
+    return sortPairs.dir*(va<vb?-1:va>vb?1:0);
+  });
+
+  if (!pairs.length) { el.innerHTML='<div class="empty"><p>Load at least 2 strategies</p></div>'; return; }
+
+  const desc=v=>v<.2?'Mostly independent':v<.4?'Weak correlation':v<.6?'Moderate':'Strongly correlated';
+
+  let h=`<table class="dt"><thead><tr>
+    <th class="rk">#</th>
+    <th data-sort="a">Strategy A</th>
+    <th data-sort="b">Strategy B</th>
+    <th data-sort="corr">Correlation</th>
+    <th>Relationship</th>
+    <th data-sort="shared" style="text-align:right">Shared Days</th>
+  </tr></thead><tbody>`;
+
+  pairs.forEach(({a,b,corr,abscorr,shared},i)=>{
+    const bw=Math.round(abscorr*100);
+    const bc=corr<0?'#6baed6':'#d73027';
+    const pnlA=Object.values(S[a].dailyPnL).reduce((s,v)=>s+v,0);
+    const pnlB=Object.values(S[b].dailyPnL).reduce((s,v)=>s+v,0);
+    h+=`<tr>
+      <td class="rk">${i+1}</td>
+      <td><strong>${a}</strong></td>
+      <td><strong>${b}</strong></td>
+      <td><div class="corr-bar-wrap">
+        <div class="corr-bar" style="width:${bw}px;background:${bc}"></div>
+        <span class="corr-val">${corr>=0?'+':''}${corr.toFixed(3)}</span>
+      </div></td>
+      <td style="color:#666;font-size:12px">${desc(abscorr)}</td>
+      <td class="num">${shared}</td>
+    </tr>`;
+  });
+  h+='</tbody></table>';
+  el.innerHTML=h;
+
+  // sort headers
+  el.querySelectorAll('th[data-sort]').forEach(th=>{
+    const col=th.dataset.sort;
+    if (col===sortPairs.col) th.classList.add(sortPairs.dir===1?'sort-asc':'sort-desc');
+    th.addEventListener('click',()=>{
+      if (sortPairs.col===col) sortPairs.dir*=-1;
+      else { sortPairs.col=col; sortPairs.dir=col==='corr'?1:-1; }
+      renderPairs();
+    });
+  });
+}
+
+// ─── RENDER SHARED DAYS ───────────────────────────────────────────────────────
+function renderSharedDays() {
+  const el=document.getElementById('sharedContainer');
+  const mat=getSharedMatrix();
+  let rows=Object.entries(mat).map(([k,v])=>{
+    const [a,b]=k.split('|');
+    return {a,b,days:v,corr:getCorr(a,b)};
+  });
+
+  rows.sort((x,y)=>{
+    let va=x[sortShared.col], vb=y[sortShared.col];
+    return sortShared.dir*(va<vb?-1:va>vb?1:0);
+  });
+
+  if (!rows.length) { el.innerHTML='<div class="empty"><p>Load at least 2 strategies</p></div>'; return; }
+
+  let h=`<table class="dt"><thead><tr>
+    <th class="rk">#</th>
+    <th data-sort="a">Strategy A</th>
+    <th data-sort="b">Strategy B</th>
+    <th data-sort="days" style="text-align:right">Shared Trade Days</th>
+    <th data-sort="corr" style="text-align:right">Monthly P&amp;L Correlation</th>
+  </tr></thead><tbody>`;
+
+  rows.forEach(({a,b,days,corr},i)=>{
+    h+=`<tr>
+      <td class="rk">${i+1}</td>
+      <td><strong>${a}</strong></td>
+      <td><strong>${b}</strong></td>
+      <td class="num">${days}</td>
+      <td class="num">${corr>=0?'+':''}${corr.toFixed(3)}</td>
+    </tr>`;
+  });
+  h+='</tbody></table>';
+  el.innerHTML=h;
+
+  el.querySelectorAll('th[data-sort]').forEach(th=>{
+    const col=th.dataset.sort;
+    if (col===sortShared.col) th.classList.add(sortShared.dir===1?'sort-asc':'sort-desc');
+    th.addEventListener('click',()=>{
+      if (sortShared.col===col) sortShared.dir*=-1;
+      else { sortShared.col=col; sortShared.dir=-1; }
+      renderSharedDays();
+    });
+  });
+}
+
+// ─── RENDER MARGIN ────────────────────────────────────────────────────────────
+function renderMargin() {
+  renderSelMargin();
+  renderAllDays();
+}
+
+function renderSelMargin() {
+  const el=document.getElementById('selMarginContainer');
+  const names=sortedNames().filter(n=>shortlist.has(n));
+  if (!names.length) {
+    el.innerHTML='<div class="empty"><div class="ei">☝️</div><p>Select strategies from the shortlist to see peak margin analysis</p></div>';
+    return;
+  }
+
+  const allTrades=names.flatMap(n=>S[n].trades);
+  const days=allPeakDays(allTrades);
+  const top=days[0];
+
+  let h='';
+
+  // Info pills
+  h+='<div class="info-row">';
+  for (const n of names) {
+    const st=S[n];
+    const margins=st.trades.map(t=>t.margin).sort((a,b)=>a-b);
+    const med=margins[Math.floor(margins.length/2)]||0;
+    h+=`<div class="info-pill"><strong>${fmtINR(med)}</strong>${n} typical margin</div>`;
+  }
+  h+='</div>';
+
+  if (top) {
+    const topD=new Date(top.date+'T00:00:00');
+    // Find strategies open at peak
+    const openAtPeak=[];
+    for (const n of names) {
+      for (const t of S[n].trades) {
+        if (t.entryDate===top.date && t.entryTime<=top.peakTime && t.exitTime>=top.peakTime) {
+          openAtPeak.push(n); break;
+        }
+      }
+    }
+    h+=`<div class="mc">
+      <div class="mc-label">Peak margin tied up simultaneously (selected strategies)</div>
+      <div class="mc-val">${fmtINR(top.peak)}</div>
+      <div class="mc-detail">on ${fmtD(topD)} at ${top.peakTime?fmtT(top.peakTime):'?'} · ${top.peakTrades} trade${top.peakTrades!==1?'s':''} open simultaneously</div>
+      ${openAtPeak.length?`<div class="mc-strats">Strategies open at peak: <strong>${openAtPeak.join(', ')}</strong></div>`:''}
+    </div>`;
+  }
+
+  // Per-strategy table
+  h+=`<table class="dt"><thead><tr>
+    <th>Strategy</th>
+    <th style="text-align:right">Trades</th>
+    <th style="text-align:right">Typical margin (median)</th>
+    <th style="text-align:right">Largest single trade</th>
+    <th style="text-align:right">Smallest margin</th>
+  </tr></thead><tbody>`;
+
+  for (const n of names) {
+    const st=S[n];
+    const margins=st.trades.map(t=>t.margin).sort((a,b)=>a-b);
+    const med=margins[Math.floor(margins.length/2)]||0;
+    const maxM=margins[margins.length-1]||0;
+    const maxT=st.trades.find(t=>t.margin===maxM);
+    const maxDate=maxT?fmtD(maxT.entryTime):'';
+    h+=`<tr>
+      <td><strong>${n}</strong></td>
+      <td class="num">${st.trades.length}</td>
+      <td class="num">${fmtINR(med)}</td>
+      <td class="num">${fmtINR(maxM)} <span style="color:#999;font-size:11px">(${maxDate})</span></td>
+      <td class="num">${fmtINR(margins[0]||0)}</td>
+    </tr>`;
+  }
+  h+='</tbody></table>';
+  el.innerHTML=h;
+}
+
+function renderAllDays() {
+  const el=document.getElementById('allMarginContainer');
+  const names=Object.keys(S);
+  if (!names.length) { el.innerHTML='<div class="empty"><p>Load strategy files to see margin analysis</p></div>'; return; }
+
+  const allTrades=names.flatMap(n=>S[n].trades);
+  const days=allPeakDays(allTrades);
+
+  // All strategies combined daily P&L
+  const allDayPnL={};
+  for (const n of names)
+    for (const [d,pnl] of Object.entries(S[n].dailyPnL))
+      allDayPnL[d]=(allDayPnL[d]||0)+pnl;
+
+  let rows=days.slice(0,10);
+
+  // sort
+  rows=days.sort((a,b)=>{
+    let va,vb;
+    if(sortDays.col==='date'){va=a.date;vb=b.date;}
+    else if(sortDays.col==='pnl'){va=allDayPnL[a.date]||0;vb=allDayPnL[b.date]||0;}
+    else if(sortDays.col==='open'){va=a.peakTrades;vb=b.peakTrades;}
+    else{va=a.peak;vb=b.peak;}
+    return sortDays.dir*(va<vb?-1:va>vb?1:0);
+  }).slice(0,10);
+
+  let h=`<table class="dt"><thead><tr>
+    <th class="rk">#</th>
+    <th data-sort="date">Date</th>
+    <th data-sort="peak" style="text-align:right">Peak margin</th>
+    <th style="text-align:right">Time of peak</th>
+    <th data-sort="open" style="text-align:right">Trades open together</th>
+    <th data-sort="pnl" style="text-align:right">P&amp;L that day (all strategies)</th>
+  </tr></thead><tbody>`;
+
+  rows.forEach(({date,peak,peakTime,peakTrades},i)=>{
+    const d=new Date(date+'T00:00:00');
+    const dayPnL=allDayPnL[date]||0;
+    const pnlCls=dayPnL>=0?'pos':'neg';
+    h+=`<tr>
+      <td class="rk">${i+1}</td>
+      <td>${fmtD(d)}</td>
+      <td class="num">${fmtINR(peak)}</td>
+      <td class="num">${peakTime?fmtT(peakTime):'?'}</td>
+      <td class="num">${peakTrades}</td>
+      <td class="num ${pnlCls}">${fmtINRSign(dayPnL)}</td>
+    </tr>`;
+  });
+  h+='</tbody></table>';
+  el.innerHTML=h;
+
+  el.querySelectorAll('th[data-sort]').forEach(th=>{
+    const col=th.dataset.sort;
+    if(col===sortDays.col) th.classList.add(sortDays.dir===1?'sort-asc':'sort-desc');
+    th.addEventListener('click',()=>{
+      if(sortDays.col===col) sortDays.dir*=-1;
+      else{sortDays.col=col;sortDays.dir=-1;}
+      renderAllDays();
+    });
+  });
+}
+
+// ─── TOOLTIP ──────────────────────────────────────────────────────────────────
+function showTip(e, cell) {
+  const tip=document.getElementById('hmTip');
+  const a=cell.dataset.a, b=cell.dataset.b, v=parseFloat(cell.dataset.v);
+  const mode=cell.dataset.mode||'monthly';
+  let label;
+  if (mode==='shared') {
+    label=`${a} × ${b} · ${Math.round(v)} shared trading days`;
+  } else {
+    const av=Math.abs(v);
+    const desc=av<.2?'mostly independent':av<.4?'weak correlation':av<.6?'moderate correlation':'strongly correlated';
+    label=`${a} × ${b} · ${v>=0?'+':''}${v.toFixed(2)} · ${desc}`;
+  }
+  tip.textContent=label;
+  tip.style.display='block';
+  tip.style.left=(e.clientX+14)+'px';
+  tip.style.top=(e.clientY-36)+'px';
+}
+function hideTip() { document.getElementById('hmTip').style.display='none'; }
+
+// ─── UI ───────────────────────────────────────────────────────────────────────
+function updateUI() {
+  const names=sortedNames();
+  const cnt=names.length;
+  if (!cnt) return;
+
+  document.getElementById('loadedBar').style.display='';
+  document.getElementById('stratSel').style.display='';
+  document.getElementById('mainTabs').style.display='';
+  document.getElementById('hdBadge').style.display='';
+  document.getElementById('hdBadge').textContent=cnt+' strateg'+(cnt===1?'y':'ies')+' loaded';
+  document.getElementById('loadedCnt').textContent=cnt+' strateg'+(cnt===1?'y':'ies')+' loaded';
+
+  // File chips
+  document.getElementById('fileChips').innerHTML=names.map(n=>
+    `<span class="fc">${n}<span class="del" data-name="${n}" title="Remove">✕</span></span>`
+  ).join('');
+
+  // Strategy chips
+  document.getElementById('stratChips').innerHTML=names.map(n=>
+    `<span class="sc${shortlist.has(n)?' sel':''}" data-name="${n}">${n}</span>`
+  ).join('');
+  document.getElementById('selCount').textContent=shortlist.size;
+
+  renderActiveTab();
+}
+
+function renderActiveTab() {
+  const tab=document.querySelector('.tab-btn.active')?.dataset.tab;
+  if (tab==='perf') renderPerformance();
+  else if (tab==='worst') renderWorstDays();
+  else if (tab==='dd') renderDrawdowns();
+  else if (tab==='corr') renderHeatmap();
+  else if (tab==='selmatrix') renderSelectedMatrix();
+  else if (tab==='pairs') renderPairs();
+  else if (tab==='shared') renderSharedDays();
+  else if (tab==='margin') renderMargin();
+}
+
+// ─── FILE LOADING ─────────────────────────────────────────────────────────────
+function loadFiles(files) {
+  const arr=[...files].slice(0, 80-Object.keys(S).length);
+  let rem=arr.length;
+  if (!rem) return;
+  for (const f of arr) {
+    const r=new FileReader();
+    r.onload=ev=>{
+      const name=extractName(f.name);
+      S[name]=buildStrategy(parseCSV(ev.target.result));
+      shortlist.add(name);
+      corrCache=null; sharedCache=null;
+      rem--;
+      if (rem===0) updateUI();
+    };
+    r.readAsText(f);
+  }
+}
+
+// ─── EVENTS ───────────────────────────────────────────────────────────────────
+// Tabs
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    renderActiveTab();
+  });
+});
+
+// Heatmap toggles
+document.querySelectorAll('.tog').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tog').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    hmMode=btn.dataset.mode;
+    renderHeatmap();
+  });
+});
+
+// Strategy chip toggle
+document.getElementById('stratChips').addEventListener('click',e=>{
+  const chip=e.target.closest('.sc');
+  if (!chip) return;
+  const n=chip.dataset.name;
+  if (shortlist.has(n)) { shortlist.delete(n); chip.classList.remove('sel'); }
+  else { shortlist.add(n); chip.classList.add('sel'); }
+  document.getElementById('selCount').textContent=shortlist.size;
+  renderHeatmap();
+  const tab=document.querySelector('.tab-btn.active')?.dataset.tab;
+  if (tab==='perf') renderPerformance();
+  if (tab==='selmatrix') renderSelectedMatrix();
+  if (tab==='margin') renderMargin();
+});
+
+// Remove strategy
+document.getElementById('fileChips').addEventListener('click',e=>{
+  const del=e.target.closest('.del');
+  if (!del) return;
+  const n=del.dataset.name;
+  delete S[n];
+  shortlist.delete(n);
+  corrCache=null; sharedCache=null;
+  updateUI();
+  if (!Object.keys(S).length) {
+    ['loadedBar','stratSel','mainTabs','hdBadge'].forEach(id=>document.getElementById(id).style.display='none');
+  }
+});
+
+// Select all / none
+document.getElementById('btnAll').addEventListener('click',()=>{
+  Object.keys(S).forEach(n=>shortlist.add(n));
+  updateUI();
+});
+document.getElementById('btnNone').addEventListener('click',()=>{
+  shortlist.clear();
+  updateUI();
+});
+
+// Upload — click to select
+const fi=document.getElementById('fileInput');
+const fi2=document.getElementById('fileInput2');
+fi.addEventListener('change',()=>{ loadFiles(fi.files); fi.value=''; });
+fi2.addEventListener('change',()=>{ loadFiles(fi2.files); fi2.value=''; });
+
+// Global drag-and-drop anywhere on the page
+let dragCounter=0;
+const overlay=document.getElementById('dropOverlay');
+
+document.addEventListener('dragenter',e=>{
+  if (!e.dataTransfer?.types?.includes('Files')) return;
+  e.preventDefault();
+  dragCounter++;
+  overlay.classList.add('show');
+});
+document.addEventListener('dragleave',e=>{
+  dragCounter--;
+  if (dragCounter<=0){ dragCounter=0; overlay.classList.remove('show'); }
+});
+document.addEventListener('dragover',e=>{ e.preventDefault(); });
+document.addEventListener('drop',e=>{
+  e.preventDefault();
+  dragCounter=0;
+  overlay.classList.remove('show');
+  if (e.dataTransfer?.files?.length) loadFiles(e.dataTransfer.files);
+});
+</script>
+</body>
+</html>
