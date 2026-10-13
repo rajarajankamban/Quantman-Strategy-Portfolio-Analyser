@@ -26,14 +26,6 @@ header .sub{font-size:12px;color:#888;margin-top:2px}
 
 .container{max-width:1500px;margin:0 auto;padding:20px}
 
-/* Loaded bar */
-.loaded-bar{background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.loaded-bar .cnt{font-weight:700;color:#2952cc;white-space:nowrap;font-size:13px}
-.file-chips{display:flex;flex-wrap:wrap;gap:5px}
-.fc{background:#f0f4ff;border:1px solid #c8d8ff;border-radius:20px;padding:2px 9px;font-size:11px;color:#3a5bc7}
-.fc .del{margin-left:5px;cursor:pointer;color:#888;font-size:10px}
-.fc .del:hover{color:#c00}
-
 /* Strategy selector */
 .strat-sel{background:#fff;border-radius:10px;padding:14px 18px;margin-bottom:16px}
 .strat-sel h3{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
@@ -191,14 +183,6 @@ header .sub{font-size:12px;color:#888;margin-top:2px}
 </header>
 
 <div class="container">
-  <!-- Loaded bar -->
-  <div class="loaded-bar" id="loadedBar" style="display:none">
-    <span class="cnt" id="loadedCnt">0 strategies</span>
-    <div class="file-chips" id="fileChips"></div>
-    <button class="btn-sm" onclick="document.getElementById('fileInput2').click()" style="margin-left:auto">+ Add more</button>
-    <input type="file" id="fileInput2" multiple accept=".csv" style="display:none">
-  </div>
-
   <!-- Strategy selector -->
   <div class="strat-sel" id="stratSel" style="display:none">
     <h3>Shortlist — select strategies for correlation table &amp; margin analysis</h3>
@@ -326,6 +310,7 @@ header .sub{font-size:12px;color:#888;margin-top:2px}
         <label>Capital <select id="pfCapital"></select></label>
         <label>Max lots <select id="pfMaxLots" title="Most lots any one strategy may trade"></select></label>
         <label><input type="checkbox" id="pfVariable"> Variable lot size <span style="color:#999">(unchecked = equal lots)</span></label>
+        <label title="Profit uses the window below. The drawdown and capital limits must also hold over each strategy's whole history before the window."><input type="checkbox" id="pfFullHist" checked> Check drawdown over full history</label>
         <label>Window
           <input type="date" id="pfFrom">
           <span style="color:#888">to</span>
@@ -358,6 +343,7 @@ let perfRangeTo   = null;
 // Portfolio tab state
 let pfCapital = 300000;
 let pfVariable = false;
+let pfFullHist = true;     // also require the drawdown limits to hold over every strategy's full history
 let pfMaxLots = 2;         // most lots any single strategy may trade (1–20)
 let pfSel = null;          // {eqKey, L}: lots-each row picked by the user; null = recommended
 let pfFrom = null;         // null = auto (common window)
@@ -732,9 +718,8 @@ function pfPeak(ds, bound, lots, floor) {
   return {peak:best, info};
 }
 
-function pfMakeState(ds, lots) {
+function pfStateCore(ds, L) {
   const D=ds.D, comb=new Float64Array(D), bound=new Float64Array(D);
-  const L=Int32Array.from(lots);
   ds.strats.forEach((s,j)=>{
     if (!L[j]) return;
     for (let d=0; d<D; d++) { comb[d]+=L[j]*s.pnl[d]; bound[d]+=L[j]*s.prem[d]; }
@@ -744,12 +729,23 @@ function pfMakeState(ds, lots) {
   return {lots:L, comb, bound, profit:cum, dd, peak:pfPeak(ds,bound,L,0).peak};
 }
 
-function pfStateOK(st, capital) {
-  return st.dd<=PF.DD_CAP*capital && st.peak+st.dd<=PF.CAP_UTIL*capital;
+// st.g (when ds.guard exists) is the same plan over the full history; it shares st.lots.
+function pfMakeState(ds, lots) {
+  const L=Int32Array.from(lots);
+  const st=pfStateCore(ds,L);
+  if (ds.guard) st.g=pfStateCore(ds.guard,L);
+  return st;
 }
 
-// Try changing strategy j by dL lots. Returns {profit,dd,peak} if the result fits the capital, else null.
-function pfTry(ds, st, j, dL, capital) {
+function pfFits(st, capital) {
+  return st.dd<=PF.DD_CAP*capital && st.peak+st.dd<=PF.CAP_UTIL*capital;
+}
+function pfStateOK(st, capital) {
+  return pfFits(st,capital) && (!st.g||pfFits(st.g,capital));
+}
+
+// Try changing strategy j by dL lots on one dataset. Returns {profit,dd,peak} if it fits the capital, else null.
+function pfTrial(ds, st, j, dL, capital) {
   const s=ds.strats[j], D=ds.D, tb=ds.tmpBound;
   let cum=0, hwm=0, dd=0;
   for (let d=0; d<D; d++) {
@@ -769,10 +765,25 @@ function pfTry(ds, st, j, dL, capital) {
   return {profit:cum, dd, peak:pk};
 }
 
-function pfApply(ds, st, j, dL, r) {
+// Must fit the window and, when a full-history guard exists, the full history too.
+function pfTry(ds, st, j, dL, capital) {
+  const r=pfTrial(ds,st,j,dL,capital);
+  if (!r||!st.g) return r;
+  const g=pfTrial(ds.guard,st.g,j,dL,capital);
+  if (!g) return null;
+  r.g=g;
+  return r;
+}
+
+function pfApplyCore(ds, st, j, dL, r) {
   const s=ds.strats[j];
   for (let d=0; d<ds.D; d++) { st.comb[d]+=dL*s.pnl[d]; st.bound[d]+=dL*s.prem[d]; }
-  st.lots[j]+=dL; st.profit=r.profit; st.dd=r.dd; st.peak=r.peak;
+  st.profit=r.profit; st.dd=r.dd; st.peak=r.peak;
+}
+function pfApply(ds, st, j, dL, r) {
+  pfApplyCore(ds,st,j,dL,r);
+  if (st.g) pfApplyCore(ds.guard,st.g,j,dL,r.g);
+  st.lots[j]+=dL;
 }
 
 // Add one lot at a time (best score first) while the plan still fits. mode: 'gain' | 'ratio'
@@ -843,9 +854,10 @@ function pfEvaluate(ds, lots) {
     n++; totalLots+=st.lots[j]; trades+=s.count; costs+=st.lots[j]*s.count*PF.COST_PER_LOT;
   });
   const losingMonths=Object.entries(byMonth).filter(([,p])=>p<0).sort((a,b)=>a[0]<b[0]?-1:1);
+  const guard=st.g?{from:ds.guard.dates[0], maxDD:st.g.dd, peakMargin:st.g.peak, capitalUsed:st.g.peak+st.g.dd}:null;
   return {netProfit:st.profit, maxDD:st.dd, peakMargin:pk.peak, peakInfo:pk.info,
           capitalUsed:pk.peak+st.dd, worstDay:worst, worstDayDate:worstIdx>=0?dates[worstIdx]:null,
-          byYear, byMonth, losingMonths, n, totalLots, trades, costs};
+          byYear, byMonth, losingMonths, n, totalLots, trades, costs, guard};
 }
 
 // Smallest capital at which any single strategy fits at 1 lot
@@ -854,7 +866,8 @@ function pfMinNeed(ds) {
   ds.strats.forEach((s,j)=>{
     const l=new Int32Array(ds.strats.length); l[j]=1;
     const st=pfMakeState(ds,l);
-    need=Math.min(need, Math.max((st.peak+st.dd)/PF.CAP_UTIL, st.dd/PF.DD_CAP));
+    const f=x=>Math.max((x.peak+x.dd)/PF.CAP_UTIL, x.dd/PF.DD_CAP);
+    need=Math.min(need, st.g?Math.max(f(st),f(st.g)):f(st));
   });
   return need;
 }
@@ -896,11 +909,19 @@ function pfCommonWindow(names) {
   return {from, to};
 }
 
-function pfBuildPlan(names, capital, variable, from, to, maxL=pfMaxLots) {
+function pfBuildPlan(names, capital, variable, from, to, maxL=pfMaxLots, fullHist=pfFullHist) {
   portfolioCache=portfolioCache||new Map();
-  const base=names.join(',')+'|'+from+'|'+to;
+  const base=names.join(',')+'|'+from+'|'+to+'|'+(fullHist?1:0);
   let dsEntry=portfolioCache.get('ds|'+base);
-  if (!dsEntry) { dsEntry=pfPrepare(names,from,to); portfolioCache.set('ds|'+base,dsEntry); }
+  if (!dsEntry) {
+    dsEntry=pfPrepare(names,from,to);
+    // Full-history guard: same strategies, every trade up to `to`. Skipped if the window already starts at the earliest data.
+    if (fullHist && dsEntry.strats.length) {
+      const g=pfPrepare(dsEntry.strats.map(s=>s.name),'0000-00-00',to);
+      if (g.dates[0]<dsEntry.dates[0]) dsEntry.guard=g;
+    }
+    portfolioCache.set('ds|'+base,dsEntry);
+  }
   const ds=dsEntry;
   if (!ds.strats.length) return {empty:true, from, to};
   const eqKey='eq|'+base+'|'+capital+'|'+maxL;
@@ -1523,7 +1544,7 @@ function renderPortfolio() {
     return;
   }
   portfolioCache=portfolioCache||new Map();
-  const key='plan|'+names.join(',')+'|'+from+'|'+to+'|'+pfCapital+'|'+(pfVariable?1:0)+'|'+pfMaxLots;
+  const key='plan|'+names.join(',')+'|'+from+'|'+to+'|'+pfCapital+'|'+(pfVariable?1:0)+'|'+pfMaxLots+'|'+(pfFullHist?1:0);
   const hit=portfolioCache.get(key);
   if (hit) { pfDraw(el,hit); return; }
 
@@ -1532,7 +1553,7 @@ function renderPortfolio() {
   setTimeout(()=>{
     if (token!==pfToken) return;
     if (portfolioCache!==cacheRef) { renderPortfolio(); return; }
-    const plan=pfBuildPlan(names,pfCapital,pfVariable,from,to,pfMaxLots);
+    const plan=pfBuildPlan(names,pfCapital,pfVariable,from,to,pfMaxLots,pfFullHist);
     portfolioCache.set(key,plan);
     pfDraw(el,plan);
   },30);
@@ -1585,7 +1606,8 @@ function pfDraw(el, plan) {
   h+=card('Capital used',fmtINR(res.capitalUsed),`${pct(res.capitalUsed)} of capital · peak margin + worst DD`,'highlight');
   h+=card('Spare cash',fmtINR(spare),`${pct(spare)} of capital`);
   h+=card('Profit',fmtINRSign(res.netProfit),`≈ ${fmtINR(res.netProfit/years)} a year`,'',sgn(res.netProfit));
-  h+=card('Worst drawdown',fmtINR(res.maxDD),`${pct(res.maxDD)} of capital`);
+  const gFrom=res.guard?fmtD(new Date(res.guard.from+'T00:00:00')):'';
+  h+=card('Worst drawdown',fmtINR(res.maxDD),`${pct(res.maxDD)} of capital`+(res.guard?` · ${fmtINR(res.guard.maxDD)} since ${gFrom}`:''));
   h+=card('Worst day',res.worstDay<0?fmtINRSign(res.worstDay):'—',res.worstDayDate?fmtD(new Date(res.worstDayDate+'T00:00:00')):'no losing day',
           '',res.worstDay<0?'neg':'');
   h+=card('Peak margin',fmtINR(res.peakMargin),pk?`${fmtD(new Date(pk.date+'T00:00:00'))} ${pk.peakTime?fmtT(pk.peakTime):''} · ${pk.peakTrades} open`:'');
@@ -1661,6 +1683,8 @@ function pfDraw(el, plan) {
   h+=`<div class="pf-h3">Capital</div><table class="dt"><thead><tr><th>Item</th><th style="text-align:right">Amount</th></tr></thead><tbody>
     <tr><td>Peak margin${pk?` <span style="color:#999;font-size:11px">(${fmtD(new Date(pk.date+'T00:00:00'))}${pk.peakTime?', '+fmtT(pk.peakTime):''})</span>`:''}</td><td class="num">${fmtINR(res.peakMargin)}</td></tr>
     <tr><td>Worst drawdown</td><td class="num">${fmtINR(res.maxDD)}</td></tr>
+    ${res.guard?`<tr><td>Worst drawdown, full history <span style="color:#999;font-size:11px">(since ${gFrom})</span></td><td class="num">${fmtINR(res.guard.maxDD)}</td></tr>
+    <tr><td>Capital used, full history <span style="color:#999;font-size:11px">(peak margin + worst drawdown)</span></td><td class="num">${fmtINR(res.guard.capitalUsed)}</td></tr>`:''}
     <tr><td><strong>Capital used</strong></td><td class="num"><strong>${fmtINR(res.capitalUsed)}</strong></td></tr>
     <tr><td>Spare cash</td><td class="num">${fmtINR(spare)}</td></tr></tbody></table>`;
 
@@ -1679,7 +1703,7 @@ function pfDraw(el, plan) {
 
   h+=`<div class="pf-note"><strong>Reading this plan</strong><br>
     Capital used = peak simultaneous margin + worst drawdown of the combined daily P&amp;L, kept within ${PF.CAP_UTIL*100}% of capital, with worst drawdown within ${PF.DD_CAP*100}% of capital.
-    1 lot = each strategy's own CSV quantity. No strategy trades more than ${plan.maxL} lot${plan.maxL===1?'':'s'}${variable?` (${PF.THIN_LOT_CAP} where a strategy has under ${PF.THIN_TRADES} trades in the window)`:''}.<br>
+    1 lot = each strategy's own CSV quantity.${res.guard?` Profit is measured over the window; the same limits were also checked over the full history back to ${gFrom}.`:''} No strategy trades more than ${plan.maxL} lot${plan.maxL===1?'':'s'}${variable?` (${PF.THIN_LOT_CAP} where a strategy has under ${PF.THIN_TRADES} trades in the window)`:''}.<br>
     Backtest results are gross of costs and the plan was chosen on this same history, so plan for live results 30–50% lower. Keep the spare cash in the account,
     watch strategies flagged weak in ${lastYear}, and paper-trade before scaling up.</div>`;
 
@@ -1730,17 +1754,10 @@ function updateUI() {
   const cnt=names.length;
   if (!cnt) return;
 
-  document.getElementById('loadedBar').style.display='';
   document.getElementById('stratSel').style.display='';
   document.getElementById('mainTabs').style.display='';
   document.getElementById('hdBadge').style.display='';
   document.getElementById('hdBadge').textContent=cnt+' strateg'+(cnt===1?'y':'ies')+' loaded';
-  document.getElementById('loadedCnt').textContent=cnt+' strateg'+(cnt===1?'y':'ies')+' loaded';
-
-  // File chips
-  document.getElementById('fileChips').innerHTML=names.map(n=>
-    `<span class="fc">${n}<span class="del" data-name="${n}" title="Remove">✕</span></span>`
-  ).join('');
 
   // Strategy chips
   document.getElementById('stratChips').innerHTML=names.map(n=>
@@ -1823,6 +1840,7 @@ document.querySelectorAll('.tog').forEach(btn=>{
   }
   ml.addEventListener('change',()=>{ pfMaxLots=+ml.value; renderPortfolio(); });
   document.getElementById('pfVariable').addEventListener('change',e=>{ pfVariable=e.target.checked; renderPortfolio(); });
+  document.getElementById('pfFullHist').addEventListener('change',e=>{ pfFullHist=e.target.checked; renderPortfolio(); });
   document.getElementById('pfFrom').addEventListener('change',e=>{ pfFrom=e.target.value||null; renderPortfolio(); });
   document.getElementById('pfTo').addEventListener('change',e=>{ pfTo=e.target.value||null; renderPortfolio(); });
   document.getElementById('pfReset').addEventListener('click',()=>{ pfFrom=null; pfTo=null; renderPortfolio(); });
@@ -1839,20 +1857,6 @@ document.getElementById('stratChips').addEventListener('click',e=>{
   renderActiveTab();
 });
 
-// Remove strategy
-document.getElementById('fileChips').addEventListener('click',e=>{
-  const del=e.target.closest('.del');
-  if (!del) return;
-  const n=del.dataset.name;
-  delete S[n];
-  shortlist.delete(n);
-  corrCache=null; sharedCache=null; portfolioCache=null;
-  updateUI();
-  if (!Object.keys(S).length) {
-    ['loadedBar','stratSel','mainTabs','hdBadge'].forEach(id=>document.getElementById(id).style.display='none');
-  }
-});
-
 // Select all / none
 document.getElementById('btnAll').addEventListener('click',()=>{
   Object.keys(S).forEach(n=>shortlist.add(n));
@@ -1865,9 +1869,7 @@ document.getElementById('btnNone').addEventListener('click',()=>{
 
 // Upload — click to select
 const fi=document.getElementById('fileInput');
-const fi2=document.getElementById('fileInput2');
 fi.addEventListener('change',()=>{ loadFiles(fi.files); fi.value=''; });
-fi2.addEventListener('change',()=>{ loadFiles(fi2.files); fi2.value=''; });
 
 // Global drag-and-drop anywhere on the page
 let dragCounter=0;
