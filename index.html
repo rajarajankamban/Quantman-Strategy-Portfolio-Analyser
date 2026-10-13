@@ -142,6 +142,24 @@ header .sub{font-size:12px;color:#888;margin-top:2px}
 .info-pill{background:#f5f5f5;border:1px solid #e8e8e8;border-radius:8px;padding:10px 16px;font-size:12px;color:#555}
 .info-pill strong{display:block;font-size:15px;color:#1a1a2e;font-weight:700}
 
+/* Portfolio builder */
+.pf-controls{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:16px;font-size:12px;color:#555}
+.pf-controls label{display:flex;align-items:center;gap:6px}
+.pf-controls select,.pf-controls input[type=date]{padding:5px 8px;border:1px solid #ddd;border-radius:6px;font-size:12px;color:#333;background:#fff}
+.pf-head{font-size:17px;font-weight:800;color:#1a1a2e;margin:4px 0 12px}
+.pf-head span{font-size:12px;font-weight:500;color:#888;margin-left:8px}
+.pf-h3{font-size:13px;font-weight:700;margin:22px 0 8px;color:#333}
+.pf-h3 span{font-weight:400;color:#999;font-size:11px;margin-left:6px}
+.pf-list{margin:0 0 4px 18px;font-size:12.5px;color:#444;line-height:1.7}
+.pf-flag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;background:#fff3e0;color:#e08000}
+.pf-flag.red{background:#fdecea;color:#c23b22}
+.pf-note{background:#fafafa;border:1px solid #eee;border-radius:8px;padding:12px 16px;font-size:12px;color:#666;line-height:1.7;margin-top:18px}
+.pf-flag.green{background:#e6f4ea;color:#0a7a2e}
+.pf-lots tbody tr{cursor:pointer}
+.pf-lots tbody tr:hover td{background:#f4f6ff}
+.pf-lots tbody tr.pf-sel td{background:#eef1ff;font-weight:700}
+.pf-lots tbody tr.pf-sel td:first-child{box-shadow:inset 3px 0 0 #2952cc}
+
 @media(max-width:700px){
   .container{padding:10px}
   .hm-cell{width:22px;height:22px;font-size:8px}
@@ -195,21 +213,21 @@ header .sub{font-size:12px;color:#888;margin-top:2px}
   <!-- Main tabs -->
   <div class="tabs" id="mainTabs" style="display:none">
     <div class="tab-nav">
-      <button class="tab-btn active" data-tab="perf">Performance</button>
+      <button class="tab-btn active" data-tab="portfolio">Portfolio</button>
+      <button class="tab-btn" data-tab="perf">Performance</button>
+      <button class="tab-btn" data-tab="margin">Margin Analysis</button>
       <button class="tab-btn" data-tab="worst">Worst Days</button>
       <button class="tab-btn" data-tab="dd">Drawdowns</button>
       <button class="tab-btn" data-tab="corr">Correlation Matrix</button>
-      <button class="tab-btn" data-tab="selmatrix">Selected Strategy Matrix</button>
       <button class="tab-btn" data-tab="pairs">Least Correlated Pairs</button>
       <button class="tab-btn" data-tab="shared">Shared Trade Days</button>
-      <button class="tab-btn" data-tab="margin">Margin Analysis</button>
     </div>
 
     <!-- Tab: Performance Summary -->
-    <div class="tab-content active" id="tab-perf">
+    <div class="tab-content" id="tab-perf">
       <div class="sec-hd">
         <h2>Strategy Performance Summary</h2>
-        <p id="perfRangeLabel">Per-strategy statistics · shortlisted strategies highlighted</p>
+        <p id="perfRangeLabel">Per-strategy statistics · selected strategies</p>
       </div>
 
       <!-- Range filter bar -->
@@ -233,7 +251,7 @@ header .sub{font-size:12px;color:#888;margin-top:2px}
     <div class="tab-content" id="tab-worst">
       <div class="sec-hd">
         <h2 id="worstDaysTitle">Top 10 Worst Days</h2>
-        <p>Days with the largest combined loss across all loaded strategies</p>
+        <p>Days with the largest combined loss across selected strategies</p>
       </div>
       <div id="worstDaysContainer"></div>
     </div>
@@ -242,7 +260,7 @@ header .sub{font-size:12px;color:#888;margin-top:2px}
     <div class="tab-content" id="tab-dd">
       <div class="sec-hd">
         <h2 id="ddTitle">Biggest Drawdowns</h2>
-        <p>How long each drawdown took to fully recover · combined equity of all loaded strategies</p>
+        <p>How long each drawdown took to fully recover · combined equity of selected strategies</p>
       </div>
       <div id="ddContainer"></div>
     </div>
@@ -260,18 +278,9 @@ header .sub{font-size:12px;color:#888;margin-top:2px}
           <div class="leg-bar"></div>
           <span>Move together</span>
         </div>
-        <span class="leg-hl">Highlighted = your shortlist</span>
+        <span class="leg-hl">Selected strategies only</span>
         <span id="hmHint" style="color:#999;font-size:11px"></span>
       </div>
-    </div>
-
-    <!-- Tab: Selected Strategy Matrix -->
-    <div class="tab-content" id="tab-selmatrix">
-      <div class="sec-hd">
-        <h2>Correlation Table — Selected Strategies</h2>
-        <p>Full matrix for shortlisted strategies · Monthly P&amp;L correlation</p>
-      </div>
-      <div class="sm-wrap"><div id="smContainer"></div></div>
     </div>
 
     <!-- Tab: Least Correlated Pairs -->
@@ -301,10 +310,30 @@ header .sub{font-size:12px;color:#888;margin-top:2px}
       <div id="selMarginContainer"></div>
 
       <div class="sec-hd" style="margin-top:30px">
-        <h2>Peak Margin Consumption Days — All Strategies</h2>
-        <p>Top 10 days when all loaded strategies together tied up the most premium at one moment</p>
+        <h2>Peak Margin Consumption Days — Selected Strategies</h2>
+        <p>Top 10 days when selected strategies together tied up the most premium at one moment</p>
       </div>
       <div id="allMarginContainer"></div>
+    </div>
+
+    <!-- Tab: Portfolio Builder -->
+    <div class="tab-content active" id="tab-portfolio">
+      <div class="sec-hd">
+        <h2>Portfolio Builder</h2>
+        <p>Best-profit mix of the shortlisted strategies that fits your capital · peak margin + worst drawdown ≤ 92% of capital, worst drawdown ≤ 5%</p>
+      </div>
+      <div class="pf-controls">
+        <label>Capital <select id="pfCapital"></select></label>
+        <label>Max lots <select id="pfMaxLots" title="Most lots any one strategy may trade"></select></label>
+        <label><input type="checkbox" id="pfVariable"> Variable lot size <span style="color:#999">(unchecked = equal lots)</span></label>
+        <label>Window
+          <input type="date" id="pfFrom">
+          <span style="color:#888">to</span>
+          <input type="date" id="pfTo">
+          <button class="btn-sm" id="pfReset" title="Back to the window all selected strategies share">Reset</button>
+        </label>
+      </div>
+      <div id="portfolioContainer"></div>
     </div>
   </div>
 </div>
@@ -326,6 +355,16 @@ let perfRangeType = 'all'; // 'all' | 'year' | 'custom'
 let perfRangeYear = null;
 let perfRangeFrom = null;  // 'YYYY-MM-DD'
 let perfRangeTo   = null;
+// Portfolio tab state
+let pfCapital = 300000;
+let pfVariable = false;
+let pfMaxLots = 2;         // most lots any single strategy may trade (1–20)
+let pfSel = null;          // {eqKey, L}: lots-each row picked by the user; null = recommended
+let pfFrom = null;         // null = auto (common window)
+let pfTo = null;
+let portfolioCache = null; // Map; invalidated on load/remove
+let pfToken = 0;
+let sortPf = {col:'profit', dir:-1};
 
 // ─── PARSE HELPERS ────────────────────────────────────────────────────────────
 const MO = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
@@ -517,7 +556,7 @@ function corrTextColor(v) {
 // ─── SHARED FULL-MATRIX RENDERER ─────────────────────────────────────────────
 function renderFullMatrix(names, el, mode) {
   // mode: 'monthly' | 'shared'
-  if (!names.length) { el.innerHTML='<div class="empty"><div class="ei">📊</div><p>Load CSV files to see the matrix</p></div>'; return; }
+  if (!names.length) { el.innerHTML='<div class="empty"><div class="ei">📊</div><p>Select strategies from the shortlist to see the correlation matrix</p></div>'; return; }
   if (names.length<2) { el.innerHTML='<div class="empty"><div class="ei">☝️</div><p>Select at least 2 strategies from the shortlist above</p></div>'; return; }
 
   const isShared=mode==='shared';
@@ -640,6 +679,238 @@ function portfolioMetrics(slNames, from, to) {
           tradingDays:dates.length, totalTrades};
 }
 
+// ─── PORTFOLIO BUILDER ENGINE ─────────────────────────────────────────────────
+// A plan = lots per strategy (1 lot = the strategy's CSV qty). Capital used = peak
+// simultaneous margin + worst drawdown of the combined daily P&L (same as the md guide).
+const PF = {CAP_UTIL:0.92, DD_CAP:0.05, THIN_TRADES:15, THIN_LOT_CAP:3, COST_PER_LOT:150};
+
+function pfPrepare(names, from, to) {
+  const strats=[];
+  for (const n of names) {
+    const trades=S[n].trades.filter(t=>t.entryDate>=from&&t.entryDate<=to);
+    if (!trades.length) continue;
+    const avgMargin=trades.reduce((s,t)=>s+t.margin,0)/trades.length;
+    strats.push({name:n, trades, qty:trades[0].qty, avgMargin, count:trades.length});
+  }
+  const dateSet=new Set();
+  for (const s of strats) for (const t of s.trades) dateSet.add(t.entryDate);
+  const dates=[...dateSet].sort();
+  const idx=new Map(dates.map((d,i)=>[d,i]));
+  const D=dates.length;
+  const dayItems=Array.from({length:D},()=>[]);
+  strats.forEach((s,si)=>{
+    s.pnl=new Float64Array(D);   // 1-lot daily P&L
+    s.prem=new Float64Array(D);  // 1-lot total premium of all trades that day (upper bound for peak)
+    for (const t of s.trades) {
+      const di=idx.get(t.entryDate);
+      s.pnl[di]+=t.profit; s.prem[di]+=t.margin;
+      dayItems[di].push({si,t});
+    }
+  });
+  return {strats, dates, dayItems, D, tmpBound:new Float64Array(D)};
+}
+
+function pfDayPeak(ds, di, lots) {
+  const tr=[];
+  for (const {si,t} of ds.dayItems[di])
+    if (lots[si]>0) tr.push({entryTime:t.entryTime, exitTime:t.exitTime, margin:t.margin*lots[si]});
+  return peakForDay(tr);
+}
+
+// Exact max over days of simultaneous margin. `floor` is a known lower bound for the answer.
+// Days are visited by descending upper bound and the scan stops once no day can beat the best.
+function pfPeak(ds, bound, lots, floor) {
+  const cand=[];
+  for (let d=0; d<ds.D; d++) if (bound[d]>floor) cand.push(d);
+  cand.sort((a,b)=>bound[b]-bound[a]);
+  let best=floor, info=null;
+  for (const d of cand) {
+    if (bound[d]<=best) break;
+    const r=pfDayPeak(ds,d,lots);
+    if (r.peak>best) { best=r.peak; info={date:ds.dates[d], peakTime:r.peakTime, peakTrades:r.peakTrades}; }
+  }
+  return {peak:best, info};
+}
+
+function pfMakeState(ds, lots) {
+  const D=ds.D, comb=new Float64Array(D), bound=new Float64Array(D);
+  const L=Int32Array.from(lots);
+  ds.strats.forEach((s,j)=>{
+    if (!L[j]) return;
+    for (let d=0; d<D; d++) { comb[d]+=L[j]*s.pnl[d]; bound[d]+=L[j]*s.prem[d]; }
+  });
+  let cum=0, hwm=0, dd=0;
+  for (let d=0; d<D; d++) { cum+=comb[d]; if (cum>hwm) hwm=cum; if (hwm-cum>dd) dd=hwm-cum; }
+  return {lots:L, comb, bound, profit:cum, dd, peak:pfPeak(ds,bound,L,0).peak};
+}
+
+function pfStateOK(st, capital) {
+  return st.dd<=PF.DD_CAP*capital && st.peak+st.dd<=PF.CAP_UTIL*capital;
+}
+
+// Try changing strategy j by dL lots. Returns {profit,dd,peak} if the result fits the capital, else null.
+function pfTry(ds, st, j, dL, capital) {
+  const s=ds.strats[j], D=ds.D, tb=ds.tmpBound;
+  let cum=0, hwm=0, dd=0;
+  for (let d=0; d<D; d++) {
+    cum+=st.comb[d]+dL*s.pnl[d];
+    if (cum>hwm) hwm=cum;
+    if (hwm-cum>dd) dd=hwm-cum;
+    tb[d]=st.bound[d]+dL*s.prem[d];
+  }
+  if (dd>PF.DD_CAP*capital) return null;
+  const limit=PF.CAP_UTIL*capital;
+  const floor=dL>0?st.peak:0;
+  if (floor+dd>limit) return null;
+  st.lots[j]+=dL;
+  const pk=pfPeak(ds,tb,st.lots,floor).peak;
+  st.lots[j]-=dL;
+  if (pk+dd>limit) return null;
+  return {profit:cum, dd, peak:pk};
+}
+
+function pfApply(ds, st, j, dL, r) {
+  const s=ds.strats[j];
+  for (let d=0; d<ds.D; d++) { st.comb[d]+=dL*s.pnl[d]; st.bound[d]+=dL*s.prem[d]; }
+  st.lots[j]+=dL; st.profit=r.profit; st.dd=r.dd; st.peak=r.peak;
+}
+
+// Add one lot at a time (best score first) while the plan still fits. mode: 'gain' | 'ratio'
+function pfGreedy(ds, capital, maxLots, st, mode) {
+  for (;;) {
+    let best=null;
+    for (let j=0; j<ds.strats.length; j++) {
+      if (st.lots[j]>=maxLots[j]) continue;
+      const r=pfTry(ds,st,j,1,capital);
+      if (!r) continue;
+      const gain=r.profit-st.profit;
+      if (gain<=0) continue;
+      const dCap=(r.peak+r.dd)-(st.peak+st.dd);
+      const score=mode==='ratio'?gain/Math.max(dCap,1):gain;
+      if (!best||score>best.score) best={j,r,score};
+    }
+    if (!best) return st;
+    pfApply(ds,st,best.j,1,best.r);
+  }
+}
+
+function pfBetter(a, b) {
+  if (a.profit>b.profit+1e-6) return true;
+  return Math.abs(a.profit-b.profit)<=1e-6 && a.dd<b.dd;
+}
+
+// Best plan under maxLots[] for this capital: greedy (two scoring rules, optionally from a seed
+// plan), then a polish pass that drops each strategy in turn and refills.
+function pfBest(ds, capital, maxLots, seed) {
+  const zeros=new Int32Array(ds.strats.length);
+  const starts=[zeros];
+  if (seed && pfStateOK(pfMakeState(ds,seed),capital)) starts.push(seed);
+  let best=null;
+  for (const start of starts)
+    for (const mode of ['ratio','gain']) {
+      const st=pfGreedy(ds,capital,maxLots,pfMakeState(ds,start),mode);
+      if (!best||pfBetter(st,best.st)) best={mode,st};
+    }
+  for (let pass=0; pass<2; pass++) {
+    let improved=false;
+    for (let j=0; j<ds.strats.length; j++) {
+      if (!best.st.lots[j]) continue;
+      const l=Int32Array.from(best.st.lots); l[j]=0;
+      const base=pfMakeState(ds,l);
+      if (!pfStateOK(base,capital)) continue;
+      const st2=pfGreedy(ds,capital,maxLots,base,best.mode);
+      if (pfBetter(st2,best.st)) { best={mode:best.mode,st:st2}; improved=true; }
+    }
+    if (!improved) break;
+  }
+  return best.st;
+}
+
+function pfEvaluate(ds, lots) {
+  const st=pfMakeState(ds,lots);
+  const dates=ds.dates, byYear={}, byMonth={};
+  let worst=0, worstIdx=-1;
+  for (let d=0; d<ds.D; d++) {
+    const p=st.comb[d];
+    if (p<worst) { worst=p; worstIdx=d; }
+    const y=dates[d].slice(0,4), m=dates[d].slice(0,7);
+    byYear[y]=(byYear[y]||0)+p; byMonth[m]=(byMonth[m]||0)+p;
+  }
+  const pk=pfPeak(ds,st.bound,st.lots,0);
+  let n=0, totalLots=0, trades=0, costs=0;
+  ds.strats.forEach((s,j)=>{
+    if (!st.lots[j]) return;
+    n++; totalLots+=st.lots[j]; trades+=s.count; costs+=st.lots[j]*s.count*PF.COST_PER_LOT;
+  });
+  const losingMonths=Object.entries(byMonth).filter(([,p])=>p<0).sort((a,b)=>a[0]<b[0]?-1:1);
+  return {netProfit:st.profit, maxDD:st.dd, peakMargin:pk.peak, peakInfo:pk.info,
+          capitalUsed:pk.peak+st.dd, worstDay:worst, worstDayDate:worstIdx>=0?dates[worstIdx]:null,
+          byYear, byMonth, losingMonths, n, totalLots, trades, costs};
+}
+
+// Smallest capital at which any single strategy fits at 1 lot
+function pfMinNeed(ds) {
+  let need=Infinity;
+  ds.strats.forEach((s,j)=>{
+    const l=new Int32Array(ds.strats.length); l[j]=1;
+    const st=pfMakeState(ds,l);
+    need=Math.min(need, Math.max((st.peak+st.dd)/PF.CAP_UTIL, st.dd/PF.DD_CAP));
+  });
+  return need;
+}
+
+// Equal lots: profit, DD and peak scale linearly with L, so solve the 1-lot problem at capital/L.
+function pfBuildEqual(ds, capital, maxL) {
+  const need=pfMinNeed(ds);
+  const lMax=Math.min(Math.floor(capital/need), maxL);
+  const ones=new Int32Array(ds.strats.length).fill(1);
+  const rows=[];
+  for (let L=1; L<=lMax; L++) {
+    const st=pfBest(ds,capital/L,ones,null);
+    if (!st.lots.some(x=>x)) continue;
+    const lots=st.lots.map(x=>x*L);
+    rows.push({L, lots, res:pfEvaluate(ds,lots)});
+  }
+  const key=r=>({profit:r.res.netProfit, dd:r.res.maxDD});
+  let best=null;
+  for (const r of rows) if (!best||pfBetter(key(r),key(best))) best=r;
+  return {rows, best, need};
+}
+
+function pfBuildVariable(ds, capital, eq, maxL) {
+  // Thin strategies are held to THIN_LOT_CAP, unless the equal plan already used more; never above maxL.
+  const maxLots=ds.strats.map((s,j)=>Math.min(maxL, Math.max(s.count<PF.THIN_TRADES?PF.THIN_LOT_CAP:maxL, eq.best.lots[j])));
+  const st=pfBest(ds,capital,maxLots,eq.best.lots);
+  return {lots:st.lots, res:pfEvaluate(ds,st.lots)};
+}
+
+// Window every selected strategy has data for: latest first-trade date → latest date
+function pfCommonWindow(names) {
+  let from='', to='';
+  for (const n of names) {
+    const ds=Object.keys(S[n].dailyPnL).sort();
+    if (!ds.length) continue;
+    if (ds[0]>from) from=ds[0];
+    if (ds[ds.length-1]>to) to=ds[ds.length-1];
+  }
+  return {from, to};
+}
+
+function pfBuildPlan(names, capital, variable, from, to, maxL=pfMaxLots) {
+  portfolioCache=portfolioCache||new Map();
+  const base=names.join(',')+'|'+from+'|'+to;
+  let dsEntry=portfolioCache.get('ds|'+base);
+  if (!dsEntry) { dsEntry=pfPrepare(names,from,to); portfolioCache.set('ds|'+base,dsEntry); }
+  const ds=dsEntry;
+  if (!ds.strats.length) return {empty:true, from, to};
+  const eqKey='eq|'+base+'|'+capital+'|'+maxL;
+  let eq=portfolioCache.get(eqKey);
+  if (!eq) { eq=pfBuildEqual(ds,capital,maxL); portfolioCache.set(eqKey,eq); }
+  if (!eq.best) return {tooSmall:true, need:eq.need, capital, from, to, ds};
+  const chosen=variable?pfBuildVariable(ds,capital,eq,maxL):{lots:eq.best.lots, res:eq.best.res};
+  return {ds, names, capital, variable, maxL, from, to, eq, eqKey, chosen};
+}
+
 function fmtPeriod(d1, d2) {
   const f=d=>MN[d.getMonth()]+' '+String(d.getFullYear()).slice(2);
   return f(d1)+' – '+f(d2);
@@ -648,8 +919,14 @@ function fmtPeriod(d1, d2) {
 function renderPerformance() {
   const el=document.getElementById('perfContainer');
   const names=sortedNames();
+  const selNames=names.filter(n=>shortlist.has(n));
   if (!names.length) {
     el.innerHTML='<div class="empty"><div class="ei">📊</div><p>Load CSV files to see performance summary</p></div>';
+    document.getElementById('perfSummaryRow').style.display='none';
+    return;
+  }
+  if (!selNames.length) {
+    el.innerHTML='<div class="empty"><div class="ei">📊</div><p>Select strategies from the shortlist to see performance summary</p></div>';
     document.getElementById('perfSummaryRow').style.display='none';
     return;
   }
@@ -687,10 +964,10 @@ function renderPerformance() {
   // ── Range bounds & label ─────────────────────────────────────────────────
   const {from,to}=perfBounds();
   const isFiltered=perfRangeType!=='all';
-  let rangeLabel='Per-strategy statistics across full trade history · shortlisted strategies highlighted';
-  if(perfRangeType==='year') rangeLabel=`Statistics for ${perfRangeYear} · shortlisted strategies highlighted`;
+  let rangeLabel=`Per-strategy statistics across full trade history · ${selNames.length} selected`;
+  if(perfRangeType==='year') rangeLabel=`Statistics for ${perfRangeYear} · ${selNames.length} selected`;
   else if(perfRangeType==='custom'&&perfRangeFrom&&perfRangeTo)
-    rangeLabel=`Statistics ${perfRangeFrom} → ${perfRangeTo} · shortlisted strategies highlighted`;
+    rangeLabel=`Statistics ${perfRangeFrom} → ${perfRangeTo} · ${selNames.length} selected`;
   document.getElementById('perfRangeLabel').textContent=rangeLabel;
 
   // ── Portfolio summary cards (shortlisted only) ───────────────────────────
@@ -726,7 +1003,7 @@ function renderPerformance() {
   }
 
   // ── Per-strategy table ───────────────────────────────────────────────────
-  let rows=names.map(n=>({...computePerfRange(n,from,to), isSl:shortlist.has(n)}));
+  let rows=selNames.map(n=>({...computePerfRange(n,from,to), isSl:true}));
   rows.sort((a,b)=>{
     let va=a[sortPerf.col], vb=b[sortPerf.col];
     if(sortPerf.col==='period'){va=a.firstDate?a.firstDate.getTime():0;vb=b.firstDate?b.firstDate.getTime():0;}
@@ -799,14 +1076,15 @@ function renderPerformance() {
 // ─── WORST DAYS ───────────────────────────────────────────────────────────────
 function renderWorstDays() {
   const el = document.getElementById('worstDaysContainer');
-  const names = sortedNames();
+  const names = sortedNames().filter(n=>shortlist.has(n));
   if (!names.length) {
-    el.innerHTML='<div class="empty"><div class="ei">📉</div><p>Load strategy files to see worst days analysis</p></div>';
+    el.innerHTML='<div class="empty"><div class="ei">📉</div><p>Select strategies from the shortlist to see worst days analysis</p></div>';
+    document.getElementById('worstDaysTitle').textContent='Top 10 Worst Days';
     return;
   }
 
   // Update title with strategy count
-  document.getElementById('worstDaysTitle').textContent=`Top 10 Worst Days, all ${names.length} strateg${names.length===1?'y':'ies'}`;
+  document.getElementById('worstDaysTitle').textContent=`Top 10 Worst Days, ${names.length} selected strateg${names.length===1?'y':'ies'}`;
 
   // Aggregate trades by date
   const byDate={};
@@ -870,13 +1148,14 @@ function renderWorstDays() {
 // ─── DRAWDOWNS ────────────────────────────────────────────────────────────────
 function renderDrawdowns() {
   const el = document.getElementById('ddContainer');
-  const names = sortedNames();
+  const names = sortedNames().filter(n=>shortlist.has(n));
   if (!names.length) {
-    el.innerHTML='<div class="empty"><div class="ei">📉</div><p>Load strategy files to see drawdown analysis</p></div>';
+    el.innerHTML='<div class="empty"><div class="ei">📉</div><p>Select strategies from the shortlist to see drawdown analysis</p></div>';
+    document.getElementById('ddTitle').textContent='Biggest Drawdowns';
     return;
   }
   document.getElementById('ddTitle').textContent=
-    `Biggest drawdowns and how long they took to recover — all ${names.length} strateg${names.length===1?'y':'ies'}`;
+    `Biggest drawdowns and how long they took to recover — ${names.length} selected strateg${names.length===1?'y':'ies'}`;
 
   // Build combined daily P&L then cumulative equity curve
   const combined={};
@@ -959,29 +1238,26 @@ function renderDrawdowns() {
   el.innerHTML=h;
 }
 
-// ─── RENDER HEATMAP (TAB 1 — ALL STRATEGIES) ─────────────────────────────────
+// ─── RENDER HEATMAP (SELECTED STRATEGIES ONLY) ───────────────────────────────
 function renderHeatmap() {
   const el=document.getElementById('hmContainer');
-  const names=sortedNames();
+  const names=sortedNames().filter(n=>shortlist.has(n));
   document.getElementById('hmHint').textContent='';
   renderFullMatrix(names, el, hmMode);
-}
-
-// ─── RENDER SELECTED MATRIX (TAB 2 — SHORTLIST ONLY) ─────────────────────────
-function renderSelectedMatrix() {
-  const el=document.getElementById('smContainer');
-  const names=sortedNames().filter(n=>shortlist.has(n));
-  renderFullMatrix(names, el, 'monthly');
 }
 
 // ─── RENDER PAIRS ─────────────────────────────────────────────────────────────
 function renderPairs() {
   const el=document.getElementById('pairsContainer');
+  const sl=new Set(sortedNames().filter(n=>shortlist.has(n)));
+  if (sl.size<2) { el.innerHTML='<div class="empty"><p>Select at least 2 strategies from the shortlist</p></div>'; return; }
   const mat=getCorrMatrix();
-  let pairs=Object.entries(mat).map(([k,v])=>{
-    const [a,b]=k.split('|');
-    return {a,b,corr:v,abscorr:Math.abs(v),shared:getShared(a,b)};
-  });
+  let pairs=Object.entries(mat)
+    .filter(([k])=>{ const [a,b]=k.split('|'); return sl.has(a)&&sl.has(b); })
+    .map(([k,v])=>{
+      const [a,b]=k.split('|');
+      return {a,b,corr:v,abscorr:Math.abs(v),shared:getShared(a,b)};
+    });
 
   // sort
   pairs.sort((x,y)=>{
@@ -1037,11 +1313,15 @@ function renderPairs() {
 // ─── RENDER SHARED DAYS ───────────────────────────────────────────────────────
 function renderSharedDays() {
   const el=document.getElementById('sharedContainer');
+  const sl=new Set(sortedNames().filter(n=>shortlist.has(n)));
+  if (sl.size<2) { el.innerHTML='<div class="empty"><p>Select at least 2 strategies from the shortlist</p></div>'; return; }
   const mat=getSharedMatrix();
-  let rows=Object.entries(mat).map(([k,v])=>{
-    const [a,b]=k.split('|');
-    return {a,b,days:v,corr:getCorr(a,b)};
-  });
+  let rows=Object.entries(mat)
+    .filter(([k])=>{ const [a,b]=k.split('|'); return sl.has(a)&&sl.has(b); })
+    .map(([k,v])=>{
+      const [a,b]=k.split('|');
+      return {a,b,days:v,corr:getCorr(a,b)};
+    });
 
   rows.sort((x,y)=>{
     let va=x[sortShared.col], vb=y[sortShared.col];
@@ -1160,13 +1440,13 @@ function renderSelMargin() {
 
 function renderAllDays() {
   const el=document.getElementById('allMarginContainer');
-  const names=Object.keys(S);
-  if (!names.length) { el.innerHTML='<div class="empty"><p>Load strategy files to see margin analysis</p></div>'; return; }
+  const names=sortedNames().filter(n=>shortlist.has(n));
+  if (!names.length) { el.innerHTML='<div class="empty"><div class="ei">☝️</div><p>Select strategies from the shortlist to see margin analysis</p></div>'; return; }
 
   const allTrades=names.flatMap(n=>S[n].trades);
   const days=allPeakDays(allTrades);
 
-  // All strategies combined daily P&L
+  // Selected strategies combined daily P&L
   const allDayPnL={};
   for (const n of names)
     for (const [d,pnl] of Object.entries(S[n].dailyPnL))
@@ -1216,6 +1496,210 @@ function renderAllDays() {
       if(sortDays.col===col) sortDays.dir*=-1;
       else{sortDays.col=col;sortDays.dir=-1;}
       renderAllDays();
+    });
+  });
+}
+
+// ─── RENDER PORTFOLIO ─────────────────────────────────────────────────────────
+function fmtLakh(n) {
+  const l=n/100000;
+  return '₹'+(Number.isInteger(l)?l:l.toFixed(2))+' lakh';
+}
+function pfMonthLabel(m) { return MN[+m.slice(5,7)-1]+' '+m.slice(0,4); }
+
+function renderPortfolio() {
+  const el=document.getElementById('portfolioContainer');
+  const names=sortedNames().filter(n=>shortlist.has(n));
+  if (!names.length) {
+    el.innerHTML='<div class="empty"><div class="ei">☝️</div><p>Select strategies from the shortlist to build a portfolio</p></div>';
+    return;
+  }
+  const common=pfCommonWindow(names);
+  const from=pfFrom||common.from, to=pfTo||common.to;
+  document.getElementById('pfFrom').value=from;
+  document.getElementById('pfTo').value=to;
+  if (from>to) {
+    el.innerHTML='<div class="empty"><div class="ei">📅</div><p>The From date is after the To date</p></div>';
+    return;
+  }
+  portfolioCache=portfolioCache||new Map();
+  const key='plan|'+names.join(',')+'|'+from+'|'+to+'|'+pfCapital+'|'+(pfVariable?1:0)+'|'+pfMaxLots;
+  const hit=portfolioCache.get(key);
+  if (hit) { pfDraw(el,hit); return; }
+
+  el.innerHTML='<div class="empty"><div class="ei">⏳</div><p>Building portfolio…</p></div>';
+  const token=++pfToken, cacheRef=portfolioCache;
+  setTimeout(()=>{
+    if (token!==pfToken) return;
+    if (portfolioCache!==cacheRef) { renderPortfolio(); return; }
+    const plan=pfBuildPlan(names,pfCapital,pfVariable,from,to,pfMaxLots);
+    portfolioCache.set(key,plan);
+    pfDraw(el,plan);
+  },30);
+}
+
+function pfDraw(el, plan) {
+  if (plan.empty) {
+    el.innerHTML='<div class="empty"><div class="ei">📭</div><p>No trades from the selected strategies in this date window</p></div>';
+    return;
+  }
+  if (plan.tooSmall) {
+    el.innerHTML=plan.need>plan.capital
+      ?`<div class="empty"><div class="ei">💰</div><p>${fmtLakh(plan.capital)} is too small: even the cheapest selected strategy needs about ${fmtINR(plan.need)} at 1 lot.<br>Pick a larger capital.</p></div>`
+      :'<div class="empty"><div class="ei">📉</div><p>No combination of the selected strategies made a profit in this window.</p></div>';
+    return;
+  }
+
+  const {ds,names,capital,variable,from,to,eq}=plan;
+  const rec=eq.best;
+  const selRow=(!variable&&pfSel&&pfSel.eqKey===plan.eqKey&&eq.rows.find(r=>r.L===pfSel.L))||rec;
+  const chosen=variable?plan.chosen:selRow;   // {lots,res}
+  const res=chosen.res, lots=chosen.lots;
+  const spare=capital-res.capitalUsed;
+  const first=new Date(ds.dates[0]+'T00:00:00'), last=new Date(ds.dates[ds.D-1]+'T00:00:00');
+  const years=Math.max((last-first)/(365.25*864e5), 1/12);
+  const lastYear=ds.dates[ds.D-1].slice(0,4);
+  const [y1,m1]=ds.dates[0].slice(0,7).split('-').map(Number);
+  const [y2,m2]=ds.dates[ds.D-1].slice(0,7).split('-').map(Number);
+  const monthsTotal=(y2-y1)*12+m2-m1+1;
+  const pct=v=>(v/capital*100).toFixed(1)+'%';
+  const sgn=v=>v>=0?'pos':'neg';
+  const eqRes=eq.best.res;
+
+  const plural=(n,w)=>n+' '+w+(n===1?'':'s');
+  const headPlan=variable
+    ?`${plural(res.n,'strategy').replace('strategys','strategies')}, ${plural(res.totalLots,'lot')} (variable lots)`
+    :`${plural(res.n,'strategy').replace('strategys','strategies')} × ${plural(selRow.L,'lot')} (equal lots)`;
+  let h=`<div class="pf-head">${fmtLakh(capital)} — ${headPlan}<span>${fmtD(first)} – ${fmtD(last)}</span></div>`;
+  if (!variable && selRow!==rec)
+    h+=`<div style="font-size:12px;color:#555;margin:-6px 0 12px">You are viewing ${plural(selRow.L,'lot')} each; the recommended plan is ${plural(rec.L,'lot')} each. <button class="btn-sm" id="pfBackRec">Show recommended</button></div>`;
+  const atCap=variable?lots.some(x=>x>=plan.maxL):selRow.L>=plan.maxL;
+  if (atCap && plan.maxL<20 && spare>0.25*capital)
+    h+=`<div style="font-size:12px;color:#e08000;margin:-6px 0 12px">The ${plan.maxL}-lot limit is holding this plan back (${pct(spare)} of capital unused). Raise Max lots to deploy more.</div>`;
+
+  // Summary cards
+  const card=(label,val,sub,cls='',vcls='')=>
+    `<div class="pf-card ${cls}"><div class="pf-label">${label}</div><div class="pf-val ${vcls}">${val}</div><div class="pf-sub">${sub}</div></div>`;
+  const pk=res.peakInfo;
+  h+='<div class="pf-cards">';
+  h+=card('Capital used',fmtINR(res.capitalUsed),`${pct(res.capitalUsed)} of capital · peak margin + worst DD`,'highlight');
+  h+=card('Spare cash',fmtINR(spare),`${pct(spare)} of capital`);
+  h+=card('Profit',fmtINRSign(res.netProfit),`≈ ${fmtINR(res.netProfit/years)} a year`,'',sgn(res.netProfit));
+  h+=card('Worst drawdown',fmtINR(res.maxDD),`${pct(res.maxDD)} of capital`);
+  h+=card('Worst day',res.worstDay<0?fmtINRSign(res.worstDay):'—',res.worstDayDate?fmtD(new Date(res.worstDayDate+'T00:00:00')):'no losing day',
+          '',res.worstDay<0?'neg':'');
+  h+=card('Peak margin',fmtINR(res.peakMargin),pk?`${fmtD(new Date(pk.date+'T00:00:00'))} ${pk.peakTime?fmtT(pk.peakTime):''} · ${pk.peakTrades} open`:'');
+  h+='</div>';
+
+  // Lots-each table (equal) or equal-vs-variable comparison
+  if (!variable) {
+    const rows=eq.rows, bi=rows.indexOf(rec);
+    const lo=rows.length>20?Math.max(0,bi-9):0, hi=rows.length>20?Math.min(rows.length,bi+11):rows.length;
+    h+=`<div class="pf-h3">Lots each<span>click a row to see its strategies · ${lo>0||hi<rows.length?`showing ${rows[lo].L}–${rows[hi-1].L} lots of ${rows[rows.length-1].L} possible`:'every lot size that fits'}</span></div>`;
+    h+=`<table class="dt pf-lots" id="pfLotsTable"><thead><tr><th>Lots each</th><th style="text-align:right">Strategies</th>
+      <th style="text-align:right">Capital needed</th><th style="text-align:right">Spare</th>
+      <th style="text-align:right">Profit</th><th style="text-align:right">Worst DD</th>
+      <th style="text-align:right">Worst day</th></tr></thead><tbody>`;
+    for (const r of rows.slice(lo,hi)) {
+      const x=r.res;
+      h+=`<tr data-l="${r.L}"${r===selRow?' class="pf-sel"':''}><td>${r.L}${r===rec?'<span class="pf-flag green" title="Highest profit that fits the capital rules">★ Recommended</span>':''}</td><td class="num">${x.n}</td>
+        <td class="num">${fmtINR(x.capitalUsed)}</td><td class="num">${fmtINR(capital-x.capitalUsed)}</td>
+        <td class="num ${sgn(x.netProfit)}">${fmtINRSign(x.netProfit)}</td><td class="num">${fmtINR(x.maxDD)}</td>
+        <td class="num ${x.worstDay<0?'neg':''}">${x.worstDay<0?fmtINRSign(x.worstDay):'—'}</td></tr>`;
+    }
+    h+='</tbody></table>';
+  } else {
+    const cmp=[
+      ['Strategies / total lots',x=>`${x.n} / ${x.totalLots}`],
+      ['Profit',x=>fmtINRSign(x.netProfit)],
+      ['Worst drawdown',x=>fmtINR(x.maxDD)],
+      ['Peak margin',x=>fmtINR(x.peakMargin)],
+      ['Capital used',x=>fmtINR(x.capitalUsed)],
+      ['Spare cash',x=>fmtINR(capital-x.capitalUsed)],
+      ['Worst day',x=>x.worstDay<0?fmtINRSign(x.worstDay):'—'],
+      [`Losing months (of ${monthsTotal})`,x=>x.losingMonths.length],
+    ];
+    h+=`<div class="pf-h3">Equal vs variable lots</div>
+      <table class="dt"><thead><tr><th></th><th style="text-align:right">Equal ${eq.best.L} lot${eq.best.L===1?'':'s'} each</th>
+      <th style="text-align:right">Variable lots</th></tr></thead><tbody>`;
+    for (const [label,f] of cmp) h+=`<tr><td>${label}</td><td class="num">${f(eqRes)}</td><td class="num"><strong>${f(res)}</strong></td></tr>`;
+    h+='</tbody></table>';
+  }
+
+  // Strategy table
+  let yStart=ds.dates.findIndex(d=>d.slice(0,4)===lastYear);
+  const srows=[];
+  ds.strats.forEach((s,j)=>{
+    const L=lots[j];
+    if (!L) return;
+    let tot=0, ly=0;
+    for (let d=0; d<ds.D; d++) { tot+=s.pnl[d]; if (d>=yStart) ly+=s.pnl[d]; }
+    srows.push({name:s.name, lots:L, qty:s.qty*L, margin:s.avgMargin*L, profit:tot*L, ly:ly*L, count:s.count});
+  });
+  srows.sort((a,b)=>{
+    const va=a[sortPf.col], vb=b[sortPf.col];
+    const c=sortPf.col==='name'?va.localeCompare(vb,undefined,{numeric:true}):(va<vb?-1:va>vb?1:0);
+    return sortPf.dir*c;
+  });
+  const th=(col,label,right=true)=>`<th data-sort="${col}"${right?' style="text-align:right"':''}>${label}</th>`;
+  h+=`<div class="pf-h3">Strategies in this plan<span>${variable?'lots set per strategy':`${plural(selRow.L,'lot')} each${selRow===rec?' · recommended':''}`} · margin per trade = average entry premium × qty</span></div>
+    <table class="dt" id="pfStratTable"><thead><tr>${th('name','Strategy',false)}${th('lots','Lots')}${th('qty','Qty')}
+    ${th('margin','Margin per trade')}${th('profit','Profit in window')}${th('ly',lastYear)}${th('count','Trades')}</tr></thead><tbody>`;
+  for (const r of srows) {
+    const flags=(r.count<PF.THIN_TRADES?`<span class="pf-flag" title="Few trades in this window: thin evidence">thin · ${r.count} trades</span>`:'')
+               +(r.ly<0?`<span class="pf-flag red" title="Negative in ${lastYear}">weak ${lastYear}</span>`:'');
+    h+=`<tr><td><strong>${r.name}</strong>${flags}</td><td class="num">${r.lots}</td><td class="num">${r.qty}</td>
+      <td class="num">${fmtINR(r.margin)}</td><td class="num ${sgn(r.profit)}">${fmtINRSign(r.profit)}</td>
+      <td class="num ${sgn(r.ly)}">${fmtINRSign(r.ly)}</td><td class="num">${r.count}</td></tr>`;
+  }
+  h+='</tbody></table>';
+  const chosenNames=new Set(ds.strats.filter((s,j)=>lots[j]).map(s=>s.name));
+  const left=names.filter(n=>!chosenNames.has(n));
+  if (left.length) h+=`<div style="font-size:11px;color:#999;margin-top:6px">Not used (${left.length}): ${left.join(', ')}</div>`;
+
+  // Capital table
+  h+=`<div class="pf-h3">Capital</div><table class="dt"><thead><tr><th>Item</th><th style="text-align:right">Amount</th></tr></thead><tbody>
+    <tr><td>Peak margin${pk?` <span style="color:#999;font-size:11px">(${fmtD(new Date(pk.date+'T00:00:00'))}${pk.peakTime?', '+fmtT(pk.peakTime):''})</span>`:''}</td><td class="num">${fmtINR(res.peakMargin)}</td></tr>
+    <tr><td>Worst drawdown</td><td class="num">${fmtINR(res.maxDD)}</td></tr>
+    <tr><td><strong>Capital used</strong></td><td class="num"><strong>${fmtINR(res.capitalUsed)}</strong></td></tr>
+    <tr><td>Spare cash</td><td class="num">${fmtINR(spare)}</td></tr></tbody></table>`;
+
+  // Bullets
+  const yrs=Object.keys(res.byYear).sort();
+  const yLabel=y=>{
+    const sm=y===String(y1)?m1:1, em=y===String(y2)?m2:12;
+    return (sm>1||em<12)?`${y} (${MN[sm-1]}${em!==sm?'–'+MN[em-1]:''})`:y;
+  };
+  const lm=res.losingMonths;
+  h+='<div class="pf-h3">Results</div><ul class="pf-list">';
+  h+=`<li>Profit ${fmtINR(res.netProfit)} (~${fmtINR(res.netProfit/years)} a year): ${yrs.map(y=>`${yLabel(y)} <span class="${sgn(res.byYear[y])}">${fmtINRSign(res.byYear[y])}</span>`).join(' · ')}</li>`;
+  h+=`<li>${lm.length?`${lm.length} of ${monthsTotal} months lost: ${lm.map(([m,p])=>`${pfMonthLabel(m)} <span class="neg">${fmtINRSign(p)}</span>`).join(', ')}`:`No losing months out of ${monthsTotal}`}${res.worstDay<0?`; worst day <span class="neg">${fmtINRSign(res.worstDay)}</span> (${fmtD(new Date(res.worstDayDate+'T00:00:00'))})`:''}</li>`;
+  h+=`<li>Costs ~${fmtINR(res.costs/years)} a year (₹${PF.COST_PER_LOT} per lot per trade assumed; not included in the figures above)</li>`;
+  h+='</ul>';
+
+  h+=`<div class="pf-note"><strong>Reading this plan</strong><br>
+    Capital used = peak simultaneous margin + worst drawdown of the combined daily P&amp;L, kept within ${PF.CAP_UTIL*100}% of capital, with worst drawdown within ${PF.DD_CAP*100}% of capital.
+    1 lot = each strategy's own CSV quantity. No strategy trades more than ${plan.maxL} lot${plan.maxL===1?'':'s'}${variable?` (${PF.THIN_LOT_CAP} where a strategy has under ${PF.THIN_TRADES} trades in the window)`:''}.<br>
+    Backtest results are gross of costs and the plan was chosen on this same history, so plan for live results 30–50% lower. Keep the spare cash in the account,
+    watch strategies flagged weak in ${lastYear}, and paper-trade before scaling up.</div>`;
+
+  el.innerHTML=h;
+  el.querySelectorAll('#pfLotsTable tbody tr[data-l]').forEach(tr=>{
+    tr.addEventListener('click',()=>{
+      const L=+tr.dataset.l;
+      pfSel=L===rec.L?null:{eqKey:plan.eqKey, L};
+      renderPortfolio();
+    });
+  });
+  const back=document.getElementById('pfBackRec');
+  if (back) back.addEventListener('click',()=>{ pfSel=null; renderPortfolio(); });
+  el.querySelectorAll('#pfStratTable th[data-sort]').forEach(t=>{
+    const col=t.dataset.sort;
+    if (col===sortPf.col) t.classList.add(sortPf.dir===1?'sort-asc':'sort-desc');
+    t.addEventListener('click',()=>{
+      if (sortPf.col===col) sortPf.dir*=-1;
+      else { sortPf.col=col; sortPf.dir=col==='name'?1:-1; }
+      renderPortfolio();
     });
   });
 }
@@ -1273,10 +1757,10 @@ function renderActiveTab() {
   else if (tab==='worst') renderWorstDays();
   else if (tab==='dd') renderDrawdowns();
   else if (tab==='corr') renderHeatmap();
-  else if (tab==='selmatrix') renderSelectedMatrix();
   else if (tab==='pairs') renderPairs();
   else if (tab==='shared') renderSharedDays();
   else if (tab==='margin') renderMargin();
+  else if (tab==='portfolio') renderPortfolio();
 }
 
 // ─── FILE LOADING ─────────────────────────────────────────────────────────────
@@ -1290,7 +1774,7 @@ function loadFiles(files) {
       const name=extractName(f.name);
       S[name]=buildStrategy(parseCSV(ev.target.result));
       shortlist.add(name);
-      corrCache=null; sharedCache=null;
+      corrCache=null; sharedCache=null; portfolioCache=null;
       rem--;
       if (rem===0) updateUI();
     };
@@ -1320,6 +1804,30 @@ document.querySelectorAll('.tog').forEach(btn=>{
   });
 });
 
+// Portfolio tab controls
+(function(){
+  const sel=document.getElementById('pfCapital');
+  for (let i=1;i<=30;i++) {
+    const o=document.createElement('option');
+    o.value=i*100000; o.textContent='₹'+i+' Lakh';
+    if (i*100000===pfCapital) o.selected=true;
+    sel.appendChild(o);
+  }
+  sel.addEventListener('change',()=>{ pfCapital=+sel.value; renderPortfolio(); });
+  const ml=document.getElementById('pfMaxLots');
+  for (let i=1;i<=20;i++) {
+    const o=document.createElement('option');
+    o.value=i; o.textContent=i+(i===1?' lot':' lots');
+    if (i===pfMaxLots) o.selected=true;
+    ml.appendChild(o);
+  }
+  ml.addEventListener('change',()=>{ pfMaxLots=+ml.value; renderPortfolio(); });
+  document.getElementById('pfVariable').addEventListener('change',e=>{ pfVariable=e.target.checked; renderPortfolio(); });
+  document.getElementById('pfFrom').addEventListener('change',e=>{ pfFrom=e.target.value||null; renderPortfolio(); });
+  document.getElementById('pfTo').addEventListener('change',e=>{ pfTo=e.target.value||null; renderPortfolio(); });
+  document.getElementById('pfReset').addEventListener('click',()=>{ pfFrom=null; pfTo=null; renderPortfolio(); });
+})();
+
 // Strategy chip toggle
 document.getElementById('stratChips').addEventListener('click',e=>{
   const chip=e.target.closest('.sc');
@@ -1328,11 +1836,7 @@ document.getElementById('stratChips').addEventListener('click',e=>{
   if (shortlist.has(n)) { shortlist.delete(n); chip.classList.remove('sel'); }
   else { shortlist.add(n); chip.classList.add('sel'); }
   document.getElementById('selCount').textContent=shortlist.size;
-  renderHeatmap();
-  const tab=document.querySelector('.tab-btn.active')?.dataset.tab;
-  if (tab==='perf') renderPerformance();
-  if (tab==='selmatrix') renderSelectedMatrix();
-  if (tab==='margin') renderMargin();
+  renderActiveTab();
 });
 
 // Remove strategy
@@ -1342,7 +1846,7 @@ document.getElementById('fileChips').addEventListener('click',e=>{
   const n=del.dataset.name;
   delete S[n];
   shortlist.delete(n);
-  corrCache=null; sharedCache=null;
+  corrCache=null; sharedCache=null; portfolioCache=null;
   updateUI();
   if (!Object.keys(S).length) {
     ['loadedBar','stratSel','mainTabs','hdBadge'].forEach(id=>document.getElementById(id).style.display='none');
