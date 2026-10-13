@@ -304,7 +304,7 @@ header .sub{font-size:12px;color:#888;margin-top:2px}
     <div class="tab-content active" id="tab-portfolio">
       <div class="sec-hd">
         <h2>Portfolio Builder</h2>
-        <p>Best-profit mix of the shortlisted strategies that fits your capital · peak margin + worst drawdown ≤ 92% of capital, worst drawdown ≤ 5%</p>
+        <p>Best-profit mix of the shortlisted strategies that fits your capital · peak margin + worst drawdown ≤ 92% of capital, worst drawdown ≤ 5% · drawdown measured at trade-exit granularity</p>
       </div>
       <div class="pf-controls">
         <label>Capital <select id="pfCapital"></select></label>
@@ -693,7 +693,13 @@ function pfPrepare(names, from, to) {
       dayItems[di].push({si,t});
     }
   });
-  return {strats, dates, dayItems, D, tmpBound:new Float64Array(D)};
+  // Pre-sort all trades by exit time once so pfWorstDDFine runs in O(T) instead of O(T log T)
+  const sortedExits=[];
+  strats.forEach((s,si)=>{
+    for (const t of s.trades) sortedExits.push({si, ms:t.exitTime.getTime(), profit:t.profit});
+  });
+  sortedExits.sort((a,b)=>a.ms-b.ms);
+  return {strats, dates, dayItems, D, tmpBound:new Float64Array(D), sortedExits};
 }
 
 function pfDayPeak(ds, di, lots) {
@@ -718,6 +724,19 @@ function pfPeak(ds, bound, lots, floor) {
   return {peak:best, info};
 }
 
+// Trade-exit-level max drawdown: advances equity after each individual trade closes, not once per day.
+// Captures intraday troughs where morning losses are only partially offset by afternoon gains.
+function pfWorstDDFine(ds, L) {
+  let cum=0, hwm=0, dd=0;
+  for (const {si,profit} of ds.sortedExits) {
+    if (!L[si]) continue;
+    cum+=L[si]*profit;
+    if (cum>hwm) hwm=cum;
+    if (hwm-cum>dd) dd=hwm-cum;
+  }
+  return dd;
+}
+
 function pfStateCore(ds, L) {
   const D=ds.D, comb=new Float64Array(D), bound=new Float64Array(D);
   ds.strats.forEach((s,j)=>{
@@ -726,7 +745,8 @@ function pfStateCore(ds, L) {
   });
   let cum=0, hwm=0, dd=0;
   for (let d=0; d<D; d++) { cum+=comb[d]; if (cum>hwm) hwm=cum; if (hwm-cum>dd) dd=hwm-cum; }
-  return {lots:L, comb, bound, profit:cum, dd, peak:pfPeak(ds,bound,L,0).peak};
+  const ddFine=pfWorstDDFine(ds,L);
+  return {lots:L, comb, bound, profit:cum, dd, ddFine, peak:pfPeak(ds,bound,L,0).peak};
 }
 
 // st.g (when ds.guard exists) is the same plan over the full history; it shares st.lots.
@@ -738,13 +758,14 @@ function pfMakeState(ds, lots) {
 }
 
 function pfFits(st, capital) {
-  return st.dd<=PF.DD_CAP*capital && st.peak+st.dd<=PF.CAP_UTIL*capital;
+  const dd=st.ddFine??st.dd;
+  return dd<=PF.DD_CAP*capital && st.peak+dd<=PF.CAP_UTIL*capital;
 }
 function pfStateOK(st, capital) {
   return pfFits(st,capital) && (!st.g||pfFits(st.g,capital));
 }
 
-// Try changing strategy j by dL lots on one dataset. Returns {profit,dd,peak} if it fits the capital, else null.
+// Try changing strategy j by dL lots on one dataset. Returns {profit,dd,ddFine,peak} if it fits, else null.
 function pfTrial(ds, st, j, dL, capital) {
   const s=ds.strats[j], D=ds.D, tb=ds.tmpBound;
   let cum=0, hwm=0, dd=0;
@@ -754,15 +775,17 @@ function pfTrial(ds, st, j, dL, capital) {
     if (hwm-cum>dd) dd=hwm-cum;
     tb[d]=st.bound[d]+dL*s.prem[d];
   }
-  if (dd>PF.DD_CAP*capital) return null;
+  if (dd>PF.DD_CAP*capital) return null;  // fast daily pre-filter
   const limit=PF.CAP_UTIL*capital;
   const floor=dL>0?st.peak:0;
   if (floor+dd>limit) return null;
   st.lots[j]+=dL;
   const pk=pfPeak(ds,tb,st.lots,floor).peak;
+  const ddFine=pfWorstDDFine(ds,st.lots);  // trade-level check
   st.lots[j]-=dL;
-  if (pk+dd>limit) return null;
-  return {profit:cum, dd, peak:pk};
+  if (ddFine>PF.DD_CAP*capital) return null;
+  if (pk+ddFine>limit) return null;
+  return {profit:cum, dd, ddFine, peak:pk};
 }
 
 // Must fit the window and, when a full-history guard exists, the full history too.
@@ -778,7 +801,7 @@ function pfTry(ds, st, j, dL, capital) {
 function pfApplyCore(ds, st, j, dL, r) {
   const s=ds.strats[j];
   for (let d=0; d<ds.D; d++) { st.comb[d]+=dL*s.pnl[d]; st.bound[d]+=dL*s.prem[d]; }
-  st.profit=r.profit; st.dd=r.dd; st.peak=r.peak;
+  st.profit=r.profit; st.dd=r.dd; st.ddFine=r.ddFine; st.peak=r.peak;
 }
 function pfApply(ds, st, j, dL, r) {
   pfApplyCore(ds,st,j,dL,r);
@@ -796,7 +819,7 @@ function pfGreedy(ds, capital, maxLots, st, mode) {
       if (!r) continue;
       const gain=r.profit-st.profit;
       if (gain<=0) continue;
-      const dCap=(r.peak+r.dd)-(st.peak+st.dd);
+      const dCap=(r.peak+(r.ddFine??r.dd))-(st.peak+(st.ddFine??st.dd));
       const score=mode==='ratio'?gain/Math.max(dCap,1):gain;
       if (!best||score>best.score) best={j,r,score};
     }
@@ -854,9 +877,14 @@ function pfEvaluate(ds, lots) {
     n++; totalLots+=st.lots[j]; trades+=s.count; costs+=st.lots[j]*s.count*PF.COST_PER_LOT;
   });
   const losingMonths=Object.entries(byMonth).filter(([,p])=>p<0).sort((a,b)=>a[0]<b[0]?-1:1);
-  const guard=st.g?{from:ds.guard.dates[0], maxDD:st.g.dd, peakMargin:st.g.peak, capitalUsed:st.g.peak+st.g.dd}:null;
-  return {netProfit:st.profit, maxDD:st.dd, peakMargin:pk.peak, peakInfo:pk.info,
-          capitalUsed:pk.peak+st.dd, worstDay:worst, worstDayDate:worstIdx>=0?dates[worstIdx]:null,
+  const dd=st.ddFine??st.dd;
+  const guardDD=st.g?(st.g.ddFine??st.g.dd):0;
+  const guard=st.g?{from:ds.guard.dates[0], maxDD:guardDD, maxDDDaily:st.g.dd, peakMargin:st.g.peak, capitalUsed:st.g.peak+guardDD}:null;
+  const worstDD=guard?Math.max(dd,guardDD):dd;
+  // Binding capital = max of window capital and guard capital (guard may have different peak margin)
+  const capitalUsed=guard?Math.max(pk.peak+dd, guard.capitalUsed):pk.peak+dd;
+  return {netProfit:st.profit, maxDD:worstDD, maxDDWindow:dd, maxDDDaily:st.dd, peakMargin:pk.peak, peakInfo:pk.info,
+          capitalUsed, worstDay:worst, worstDayDate:worstIdx>=0?dates[worstIdx]:null,
           byYear, byMonth, losingMonths, n, totalLots, trades, costs, guard};
 }
 
@@ -866,7 +894,7 @@ function pfMinNeed(ds) {
   ds.strats.forEach((s,j)=>{
     const l=new Int32Array(ds.strats.length); l[j]=1;
     const st=pfMakeState(ds,l);
-    const f=x=>Math.max((x.peak+x.dd)/PF.CAP_UTIL, x.dd/PF.DD_CAP);
+    const f=x=>{const d=x.ddFine??x.dd; return Math.max((x.peak+d)/PF.CAP_UTIL, d/PF.DD_CAP);};
     need=Math.min(need, st.g?Math.max(f(st),f(st.g)):f(st));
   });
   return need;
@@ -1607,7 +1635,7 @@ function pfDraw(el, plan) {
   h+=card('Spare cash',fmtINR(spare),`${pct(spare)} of capital`);
   h+=card('Profit',fmtINRSign(res.netProfit),`≈ ${fmtINR(res.netProfit/years)} a year`,'',sgn(res.netProfit));
   const gFrom=res.guard?fmtD(new Date(res.guard.from+'T00:00:00')):'';
-  h+=card('Worst drawdown',fmtINR(res.maxDD),`${pct(res.maxDD)} of capital`+(res.guard?` · ${fmtINR(res.guard.maxDD)} since ${gFrom}`:''));
+  h+=card('Worst drawdown',fmtINR(res.maxDD),`${pct(res.maxDD)} of capital`+(res.guard?` · since ${gFrom}`:''));
   h+=card('Worst day',res.worstDay<0?fmtINRSign(res.worstDay):'—',res.worstDayDate?fmtD(new Date(res.worstDayDate+'T00:00:00')):'no losing day',
           '',res.worstDay<0?'neg':'');
   h+=card('Peak margin',fmtINR(res.peakMargin),pk?`${fmtD(new Date(pk.date+'T00:00:00'))} ${pk.peakTime?fmtT(pk.peakTime):''} · ${pk.peakTrades} open`:'');
@@ -1682,7 +1710,7 @@ function pfDraw(el, plan) {
   // Capital table
   h+=`<div class="pf-h3">Capital</div><table class="dt"><thead><tr><th>Item</th><th style="text-align:right">Amount</th></tr></thead><tbody>
     <tr><td>Peak margin${pk?` <span style="color:#999;font-size:11px">(${fmtD(new Date(pk.date+'T00:00:00'))}${pk.peakTime?', '+fmtT(pk.peakTime):''})</span>`:''}</td><td class="num">${fmtINR(res.peakMargin)}</td></tr>
-    <tr><td>Worst drawdown</td><td class="num">${fmtINR(res.maxDD)}</td></tr>
+    <tr><td>Worst drawdown</td><td class="num">${fmtINR(res.maxDDWindow)}</td></tr>
     ${res.guard?`<tr><td>Worst drawdown, full history <span style="color:#999;font-size:11px">(since ${gFrom})</span></td><td class="num">${fmtINR(res.guard.maxDD)}</td></tr>
     <tr><td>Capital used, full history <span style="color:#999;font-size:11px">(peak margin + worst drawdown)</span></td><td class="num">${fmtINR(res.guard.capitalUsed)}</td></tr>`:''}
     <tr><td><strong>Capital used</strong></td><td class="num"><strong>${fmtINR(res.capitalUsed)}</strong></td></tr>
