@@ -316,6 +316,22 @@ header .sub{font-size:12px;color:#888;margin-top:2px}
           <span style="color:#888">to</span>
           <input type="date" id="pfTo">
           <button class="btn-sm" id="pfReset" title="Back to the window all selected strategies share">Reset</button>
+          <span id="pfDuration" style="color:#888;font-size:11px;margin-left:4px"></span>
+        </label>
+        <label>Quick
+          <select id="pfYearFilter">
+            <option value="">Custom</option>
+            <option value="1">1 year</option>
+            <option value="2">2 years</option>
+            <option value="3">3 years</option>
+            <option value="4">4 years</option>
+            <option value="5">5 years</option>
+            <option value="6">6 years</option>
+            <option value="7">7 years</option>
+            <option value="8">8 years</option>
+            <option value="9">9 years</option>
+            <option value="10">10 years</option>
+          </select>
         </label>
       </div>
       <div id="portfolioContainer"></div>
@@ -346,7 +362,7 @@ let pfVariable = false;
 let pfFullHist = true;     // also require the drawdown limits to hold over every strategy's full history
 let pfMaxLots = 2;         // most lots any single strategy may trade (1–20)
 let pfSel = null;          // {eqKey, L}: lots-each row picked by the user; null = recommended
-let pfFrom = null;         // null = auto (common window)
+let pfFrom = '2023-08-01'; // default start date
 let pfTo = null;
 let portfolioCache = null; // Map; invalidated on load/remove
 let pfToken = 0;
@@ -923,6 +939,48 @@ function pfBuildVariable(ds, capital, eq, maxL) {
   const maxLots=ds.strats.map((s,j)=>Math.min(maxL, Math.max(s.count<PF.THIN_TRADES?PF.THIN_LOT_CAP:maxL, eq.best.lots[j])));
   const st=pfBest(ds,capital,maxLots,eq.best.lots);
   return {lots:st.lots, res:pfEvaluate(ds,st.lots)};
+}
+
+function pfDurationLabel(from, to) {
+  if (!from || !to || from >= to) return '';
+  const d1 = new Date(from), d2 = new Date(to);
+  let months = (d2.getFullYear() - d1.getFullYear()) * 12 + d2.getMonth() - d1.getMonth();
+  if (d2.getDate() < d1.getDate()) months--;
+  const y = Math.floor(months / 12), m = months % 12;
+  if (y > 0 && m > 0) return `${y}y ${m}m`;
+  if (y > 0) return `${y} year${y > 1 ? 's' : ''}`;
+  return `${Math.max(1, months)} month${months !== 1 ? 's' : ''}`;
+}
+
+function pfSessionPill(r) {
+  const dom=r.mn>=r.af&&r.mn>=r.ev?'mn':r.af>=r.ev?'af':'ev';
+  const cfg={
+    mn:{label:'Morning',   bg:'#dbeafe',color:'#1d4ed8',border:'#93c5fd'},
+    af:{label:'Afternoon', bg:'#fef9c3',color:'#a16207',border:'#fcd34d'},
+    ev:{label:'Evening',   bg:'#ffe4e6',color:'#be123c',border:'#fca5a5'},
+  };
+  const {label,bg,color,border}=cfg[dom];
+  const tip=`Morning (9–12): ${r.mn} · Afternoon (12–2): ${r.af} · Evening (2–3:30): ${r.ev}`;
+  return `<span style="display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;background:${bg};color:${color};border:1px solid ${border};white-space:nowrap" title="${tip}">${label} · ${r[dom]}</span>`;
+}
+
+function pfCorrMatrixHTML(names) {
+  let h='<table class="sm-table"><thead><tr><th class="sl"></th>';
+  for (const n of names) h+=`<th style="text-align:center;padding:4px 6px;font-size:11px;font-weight:700">${n}</th>`;
+  h+='</tr></thead><tbody>';
+  for (const na of names) {
+    h+=`<tr><th class="sl">${na}</th>`;
+    for (const nb of names) {
+      if (na===nb) {
+        h+='<td class="sm-cell diag">1.00</td>';
+      } else {
+        const v=getCorr(na,nb);
+        h+=`<td class="sm-cell" style="background:${corrColor(v)};color:${corrTextColor(v)}">${v.toFixed(2)}</td>`;
+      }
+    }
+    h+='</tr>';
+  }
+  return h+'</tbody></table>';
 }
 
 // Window every selected strategy has data for: latest first-trade date → latest date
@@ -1567,6 +1625,8 @@ function renderPortfolio() {
   const from=pfFrom||common.from, to=pfTo||common.to;
   document.getElementById('pfFrom').value=from;
   document.getElementById('pfTo').value=to;
+  const durEl=document.getElementById('pfDuration');
+  if (durEl) durEl.textContent=pfDurationLabel(from,to);
   if (from>to) {
     el.innerHTML='<div class="empty"><div class="ei">📅</div><p>The From date is after the To date</p></div>';
     return;
@@ -1684,7 +1744,9 @@ function pfDraw(el, plan) {
     if (!L) return;
     let tot=0, ly=0;
     for (let d=0; d<ds.D; d++) { tot+=s.pnl[d]; if (d>=yStart) ly+=s.pnl[d]; }
-    srows.push({name:s.name, lots:L, qty:s.qty*L, margin:s.avgMargin*L, profit:tot*L, ly:ly*L, count:s.count});
+    let mn=0, af=0, ev=0;
+    for (const t of s.trades) { const h=t.entryTime.getHours(); if (h<12) mn++; else if (h<14) af++; else ev++; }
+    srows.push({name:s.name, lots:L, qty:s.qty*L, margin:s.avgMargin*L, profit:tot*L, ly:ly*L, count:s.count, mn, af, ev});
   });
   srows.sort((a,b)=>{
     const va=a[sortPf.col], vb=b[sortPf.col];
@@ -1694,13 +1756,13 @@ function pfDraw(el, plan) {
   const th=(col,label,right=true)=>`<th data-sort="${col}"${right?' style="text-align:right"':''}>${label}</th>`;
   h+=`<div class="pf-h3">Strategies in this plan<span>${variable?'lots set per strategy':`${plural(selRow.L,'lot')} each${selRow===rec?' · recommended':''}`} · margin per trade = average entry premium × qty</span></div>
     <table class="dt" id="pfStratTable"><thead><tr>${th('name','Strategy',false)}${th('lots','Lots')}${th('qty','Qty')}
-    ${th('margin','Margin per trade')}${th('profit','Profit in window')}${th('ly',lastYear)}${th('count','Trades')}</tr></thead><tbody>`;
+    ${th('margin','Margin per trade')}${th('profit','Profit in window')}${th('ly',lastYear)}${th('count','Trades')}<th>Session</th></tr></thead><tbody>`;
   for (const r of srows) {
     const flags=(r.count<PF.THIN_TRADES?`<span class="pf-flag" title="Few trades in this window: thin evidence">thin · ${r.count} trades</span>`:'')
                +(r.ly<0?`<span class="pf-flag red" title="Negative in ${lastYear}">weak ${lastYear}</span>`:'');
     h+=`<tr><td><strong>${r.name}</strong>${flags}</td><td class="num">${r.lots}</td><td class="num">${r.qty}</td>
       <td class="num">${fmtINR(r.margin)}</td><td class="num ${sgn(r.profit)}">${fmtINRSign(r.profit)}</td>
-      <td class="num ${sgn(r.ly)}">${fmtINRSign(r.ly)}</td><td class="num">${r.count}</td></tr>`;
+      <td class="num ${sgn(r.ly)}">${fmtINRSign(r.ly)}</td><td class="num">${r.count}</td><td>${pfSessionPill(r)}</td></tr>`;
   }
   h+='</tbody></table>';
   const chosenNames=new Set(ds.strats.filter((s,j)=>lots[j]).map(s=>s.name));
@@ -1728,6 +1790,11 @@ function pfDraw(el, plan) {
   h+=`<li>${lm.length?`${lm.length} of ${monthsTotal} months lost: ${lm.map(([m,p])=>`${pfMonthLabel(m)} <span class="neg">${fmtINRSign(p)}</span>`).join(', ')}`:`No losing months out of ${monthsTotal}`}${res.worstDay<0?`; worst day <span class="neg">${fmtINRSign(res.worstDay)}</span> (${fmtD(new Date(res.worstDayDate+'T00:00:00'))})`:''}</li>`;
   h+=`<li>Costs ~${fmtINR(res.costs/years)} a year (₹${PF.COST_PER_LOT} per lot per trade assumed; not included in the figures above)</li>`;
   h+='</ul>';
+
+  if (srows.length>=2) {
+    h+='<div class="pf-h3">Correlation between strategies in this plan</div>';
+    h+='<div style="overflow-x:auto">'+pfCorrMatrixHTML(srows.map(r=>r.name))+'</div>';
+  }
 
   h+=`<div class="pf-note"><strong>Reading this plan</strong><br>
     Capital used = peak simultaneous margin + worst drawdown of the combined daily P&amp;L, kept within ${PF.CAP_UTIL*100}% of capital, with worst drawdown within ${PF.DD_CAP*100}% of capital.
@@ -1869,9 +1936,22 @@ document.querySelectorAll('.tog').forEach(btn=>{
   ml.addEventListener('change',()=>{ pfMaxLots=+ml.value; renderPortfolio(); });
   document.getElementById('pfVariable').addEventListener('change',e=>{ pfVariable=e.target.checked; renderPortfolio(); });
   document.getElementById('pfFullHist').addEventListener('change',e=>{ pfFullHist=e.target.checked; renderPortfolio(); });
-  document.getElementById('pfFrom').addEventListener('change',e=>{ pfFrom=e.target.value||null; renderPortfolio(); });
-  document.getElementById('pfTo').addEventListener('change',e=>{ pfTo=e.target.value||null; renderPortfolio(); });
-  document.getElementById('pfReset').addEventListener('click',()=>{ pfFrom=null; pfTo=null; renderPortfolio(); });
+  document.getElementById('pfFrom').addEventListener('change',e=>{ pfFrom=e.target.value||null; document.getElementById('pfYearFilter').value=''; renderPortfolio(); });
+  document.getElementById('pfTo').addEventListener('change',e=>{ pfTo=e.target.value||null; document.getElementById('pfYearFilter').value=''; renderPortfolio(); });
+  document.getElementById('pfReset').addEventListener('click',()=>{ pfFrom=null; pfTo=null; document.getElementById('pfYearFilter').value=''; renderPortfolio(); });
+  document.getElementById('pfYearFilter').addEventListener('change',e=>{
+    const val=e.target.value;
+    if (!val) return;
+    const names=sortedNames().filter(n=>shortlist.has(n));
+    if (!names.length) return;
+    const toDate=pfTo||pfCommonWindow(names).to;
+    if (!toDate) return;
+    const d=new Date(toDate);
+    d.setFullYear(d.getFullYear()-+val);
+    pfFrom=d.toISOString().slice(0,10);
+    pfTo=null;
+    renderPortfolio();
+  });
 })();
 
 // Strategy chip toggle
